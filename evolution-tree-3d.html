@@ -34,6 +34,8 @@
     }
     .actions > :last-child { border-right: 0; }
     .actions button:hover, .actions a:hover { background: #fff; color: #000; }
+    .actions #flat-graph[aria-pressed="true"] { background: #fff; color: #000; }
+    .actions button:disabled { color: #777; cursor: wait; }
     .actions button:focus-visible, .actions a:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
     .scene {
       position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab;
@@ -45,10 +47,16 @@
     .avatars { z-index: 2; pointer-events: none; }
     .guide { fill: none; stroke: rgba(255,255,255,.14); stroke-width: 1; stroke-dasharray: 4 6; }
     .guide.ground { stroke: rgba(255,255,255,.28); stroke-dasharray: none; }
-    .edge { fill: none; stroke: var(--color); stroke-width: var(--width,3px); stroke-linecap: round; stroke-linejoin: round; opacity: .72; transition: opacity .14s, stroke .14s, stroke-width .14s; }
+    #guides { transition: opacity .35s ease; }
+    .growing #guides, .flat-view #guides { opacity: 0; }
+    .edge { fill: none; stroke: var(--color); stroke-width: var(--width,3px); stroke-linecap: round; stroke-linejoin: round; opacity: .72; transition: opacity .14s, stroke .14s, stroke-width .14s; pointer-events: stroke; cursor: pointer; }
     .edge.muted { opacity: .1; }
     .edge.group { stroke: var(--active); stroke-width: calc(var(--width,3px) + 2px); opacity: 1; }
     .edge.path { stroke: #fff; stroke-width: calc(var(--width,3px) + 4px); opacity: 1; }
+    .edge.editing { stroke: #fff; stroke-width: calc(var(--width,3px) + 3px); opacity: 1; }
+    .edge-label { fill: #fff; stroke: #000; stroke-width: 3px; paint-order: stroke fill; font: 10px ui-monospace, "SFMono-Regular", Menlo, monospace; text-anchor: middle; dominant-baseline: central; pointer-events: auto; cursor: pointer; user-select: none; }
+    .edge-label:hover, .edge-label.selected { fill: #ffd75f; font-size: 13px; font-weight: 700; }
+    .flat-view .edge, .flat-view .edge-label { pointer-events: none; cursor: default; }
     .node { fill: var(--color); stroke: #000; stroke-width: 1.5; opacity: .9; transition: opacity .14s, fill .14s; }
     .node.muted { opacity: .14; }
     .node.group { fill: var(--active); opacity: 1; }
@@ -70,7 +78,29 @@
     .avatar.selected::before { content: ""; position: absolute; inset: -4px; border: 2px solid var(--color); border-radius: 50%; }
     .avatar.muted { opacity: .09; }
     .avatar.offscreen { display: none; }
-    .hide-labels .avatar::after { display: none; }
+    .hide-labels .avatar::after, .hide-labels .edge-label { display: none; }
+    .flat-view .avatar::after, .flat-view .edge-label,
+    .growing .avatar::after, .growing .edge-label { display: none; }
+    .branches-only .avatars, .branches-only #guides, .branches-only #nodes, .branches-only .branch-nav, .branches-only .note { display: none !important; }
+    .branch-editor {
+      position: absolute; z-index: 45; top: 58px; right: 18px; width: 292px;
+      border: 1px solid rgba(255,255,255,.48); background: rgba(0,0,0,.93); color: #fff;
+      font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; backdrop-filter: blur(12px);
+      box-shadow: 0 14px 38px rgba(0,0,0,.7); cursor: default; touch-action: auto;
+    }
+    .branch-editor[hidden] { display: none; }
+    .branch-editor-head { min-height: 34px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+    .branch-editor-head strong { padding: 0 10px; font-size: 11px; text-transform: uppercase; }
+    .branch-editor button { min-height: 32px; border: 0; border-left: 1px solid var(--line); background: transparent; color: #fff; font: 9px ui-monospace, "SFMono-Regular", Menlo, monospace; text-transform: uppercase; cursor: pointer; }
+    .branch-editor button:hover { background: #fff; color: #000; }
+    .branch-close { width: 34px; font-size: 15px !important; }
+    .branch-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding: 10px; }
+    .branch-fields label { display: grid; gap: 4px; color: var(--muted); font-size: 8px; text-transform: uppercase; }
+    .branch-fields input { width: 100%; min-width: 0; height: 30px; padding: 4px 7px; border: 1px solid var(--line); border-radius: 0; background: #080808; color: #fff; font: 11px ui-monospace, "SFMono-Regular", Menlo, monospace; }
+    .branch-fields input:focus { outline: 1px solid #fff; outline-offset: 1px; }
+    .branch-editor-foot { min-height: 33px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line); }
+    .branch-editor-foot span { padding: 0 10px; color: var(--muted); font-size: 7px; text-transform: uppercase; }
+    .branch-editor-foot button { padding: 0 10px; }
     .branch-nav, .note, .error {
       position: absolute; z-index: 30; border: 1px solid rgba(255,255,255,.4);
       background: rgba(0,0,0,.9); color: #fff; backdrop-filter: blur(10px);
@@ -103,6 +133,7 @@
       .group-button::before { left:4px;width:5px; }
       .note { display:none; }
       .avatar { width:58px;height:88px; }
+      .branch-editor { top: 49px; right: 8px; width: 250px; }
     }
     @media (prefers-reduced-motion: reduce) { *,*::before,*::after{transition-duration:.01ms!important} }
   </style>
@@ -113,13 +144,30 @@
       <button id="play" type="button" aria-pressed="true">Pause all</button>
       <button id="labels" type="button" aria-pressed="true">Hide labels</button>
       <button id="reset" type="button">Reset view</button>
+      <button id="flat-graph" type="button" aria-pressed="false">2D graph</button>
+      <button id="growth-animation" type="button">2D → 3D</button>
+      <button id="rotate-camera" type="button">Rotate 90°</button>
+      <button id="branches-only" type="button" aria-pressed="false">Branches only</button>
+      <button id="export-layout" type="button">Export layout</button>
+      <button id="import-layout" type="button">Load layout</button>
+      <input id="layout-file" class="visually-hidden" type="file" accept="application/json,.json" />
       <a href="circular-tree.html">2D tree</a>
       <a href="avatar-map.html">Embedding</a>
     </nav>
     <output id="summary" class="visually-hidden" aria-live="polite">Loading hierarchy…</output>
     <section id="scene" class="scene" aria-label="Rotatable three-dimensional motion lineage">
-      <svg id="tree" class="tree" role="img" aria-label="Projected three-dimensional phylogenetic tree"><g id="guides"></g><g id="edges"></g><g id="nodes"></g></svg>
+      <svg id="tree" class="tree" role="img" aria-label="Projected three-dimensional phylogenetic tree"><g id="guides"></g><g id="edges"></g><g id="nodes"></g><g id="edge-labels"></g></svg>
       <div id="avatars" class="avatars"></div>
+      <aside id="branch-editor" class="branch-editor" aria-label="Selected branch editor" hidden>
+        <div class="branch-editor-head"><strong id="branch-title">Branch</strong><button id="branch-close" class="branch-close" type="button" aria-label="Close branch editor">×</button></div>
+        <div class="branch-fields">
+          <label>X rotation (°)<input id="branch-x" type="number" min="-180" max="180" step="1" value="0" /></label>
+          <label>Y rotation (°)<input id="branch-y" type="number" min="-180" max="180" step="1" value="0" /></label>
+          <label>Z rotation (°)<input id="branch-z" type="number" min="-180" max="180" step="1" value="0" /></label>
+          <label>Length<input id="branch-length" type="number" min="0.1" step="0.1" value="1" /></label>
+        </div>
+        <div class="branch-editor-foot"><span>Edits move descendants</span><button id="branch-reset" type="button">Reset branch</button></div>
+      </aside>
       <output id="panel" class="visually-hidden" aria-live="polite">Tree-like organic lineage</output>
       <nav class="branch-nav" aria-label="Branch navigation"><span>Highlight branch</span><button id="previous" type="button" aria-label="Previous branch">←</button><div id="groups" class="groups"></div><button id="next" type="button" aria-label="Next branch">→</button><button id="all" type="button" aria-pressed="true">All</button><output id="branch-status">All branches</output></nav>
       <p class="note">The crown rises and fans around the trunk; leaders arc upward while lateral growth spirals into three-dimensional space.</p>
@@ -132,8 +180,10 @@
     const NS = "http://www.w3.org/2000/svg";
     const BASE_LENGTH = 1.78, CROWN_SCALE = 2.5, LOWER_SHOOT_SCALE = 1.6, STRAIGHT_TRUNK_LEVELS = 10, FORK_BALANCE = .65, GOLDEN_ANGLE = Math.PI*(3-Math.sqrt(5)), TOP_BRANCH_STEP = Math.PI/4, TOP_BRANCH_ELEVATION = Math.SQRT1_2, DEFAULT_YAW = .225, DISPLAY_RIGHT_AZIMUTH = .56, CANOPY_X = 19, CANOPY_Z = 15.5, CAMERA = 125, SPEED = 3;
     const COLORS = ["var(--a)","var(--b)","var(--c)","var(--d)","var(--e)","var(--f)"];
-    const el = Object.fromEntries(["app","summary","play","labels","reset","scene","tree","guides","edges","nodes","avatars","panel","previous","groups","next","all","branch-status","error","error-detail"].map(id => [id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()), document.getElementById(id)]));
-    const s = { movements:[], movementById:new Map(), nodes:new Map(), positions:new Map(), headings:new Map(), children:new Map(), targets:new Map(), depths:new Map(), leaderChildByParent:new Map(), trunkChildByParent:new Map(), trunkSideByNode:new Map(), launchAzimuthByNode:new Map(), launchVectorByNode:new Map(), fibonacciPhaseByNode:new Map(), trunkTip:null, tipPositions:[], maxDepth:0, maxHeight:1, clusters:[], clusterByMovement:new Map(), clusterByNode:new Map(), edgeItems:[], nodeItems:[], guideItems:[], avatars:[], loaded:0, failed:0, playing:true, labels:true, selected:null, active:-1, yaw:DEFAULT_YAW, pitch:-.3, zoom:1, fitBase:1, width:1, height:1, pointer:null, px:0, py:0, root:null, projectionFrame:null, trackingFrame:null };
+    const DEFAULT_BRANCH_LAYOUT = [["m1",-26,-40,0,6.34],["m2",0,0,0,5.62046],["m3",0,0,0,5.7101],["m4",0,0,0,6.4986],["m5",0,0,0,16.5529],["m6",0,0,0,16.707],["m7",21,0,-17,16.7],["m8",0,0,0,16.66998],["m9",0,0,0,16.78858],["m10",0,0,0,8.096],["m11",0,0,0,8.28798],["m12",0,0,0,10.00744],["m13",0,0,0,9.18794],["m14",0,0,0,8.32554],["m15",0,0,0,10.25988],["m16",0,0,0,10.22442],["m17",0,20,0,15.6],["m18",0,0,0,5.62582],["m19",-15,0,20,10],["m20",0,0,0,11.24806],["m21",0,0,0,10.20034],["m22",0,0,-28,12.5],["m23",0,0,0,4.34038],["m24",0,0,0,11.84872],["m25",0,0,0,11.47162],["m26",0,0,0,10.914],["m27",0,0,0,11.38056],["m28",0,0,0,10.92168],["m29",0,0,0,10.72192],["m30",0,0,0,11.17516],["m31",0,0,0,12.15534],["m32",0,0,0,11.14004],["m33",0,0,0,10.01192],["m34",0,0,0,11.97786],["m35",0,0,0,10.08102],["m36",0,0,0,10.72656],["m37",0,0,0,10.48852],["m38",0,0,0,10.62856],["m39",0,0,0,4.7493],["m40",32,0,0,6.32],["m41",0,0,0,5.71638],["m42",0,0,0,10.85214],["m43",0,0,0,11.08506],["m44",0,0,0,10.43432],["m45",0,0,0,10.05284],["m46",0,0,0,11.40188],["m47",0,0,0,10.63322],["m48",0,0,0,11.04702],["m49",0,0,0,9.55996],["m50",0,0,0,12.94644],["m51",0,0,0,12.05666],["m52",0,0,0,6.82346],["m53",0,0,0,6.07256],["m54",0,-40,0,11.6],["m55",0,0,0,11.92896],["m56",0,0,0,12.42724],["m57",-7,0,0,7.78],["m58",29,0,0,8.4],["m59",0,0,0,11.2],["c60",0,0,0,15.0299],["c61",0,0,0,15.97352],["c62",0,0,0,15.66842],["c63",0,0,0,14.90166],["c64",0,0,0,12.9626],["c65",0,0,0,9.4],["c66",0,0,0,14.76634],["c67",21,-19,12,8.64],["c68",0,0,34,14.84],["c69",0,0,0,16.43394],["c70",0,0,0,5],["c71",0,0,0,11.35732],["c72",0,-19,0,11.32],["c73",-8,0,21,10.76],["c74",0,0,0,9.89582],["c75",0,0,0,10.08934],["c76",0,0,0,10.54408],["c77",-1,0,-14,11.54],["c78",0,0,0,11.27256],["c79",-15,0,0,11.62],["c80",0,0,0,9.01672],["c81",0,0,0,9.69996],["c82",0,0,0,9.17682],["c83",14,-85,0,10.02],["c84",0,0,0,9.25192],["c85",-30,0,-15,9.92],["c86",-43,-32,0,9.2],["c87",0,0,0,9.39474],["c88",-36,0,0,8.96],["c89",-34,0,0,10.8],["c90",0,0,0,15.27788],["c91",-15,-22,0,14.74],["c92",0,0,20,10.92],["c93",0,0,0,15.14178],["c94",0,0,0,15.43248],["c95",-2,0,13,14.68],["c96",0,0,0,5.34568],["c97",-35,0,0,5.9],["c98",0,0,0,15.20528],["c99",0,0,-17,5.46],["c100",45,0,0,7.04],["c101",0,0,0,3.98386],["c102",0,0,0,3.96126],["c103",0,0,0,3.93866],["c104",0,0,0,3.91606],["c105",0,0,0,6.47536],["c106",0,0,0,3.89512],["c107",0,0,0,3.87252],["c108",-28,10,-19,7],["c109",0,0,0,3.85158],["c110",0,0,0,3.60872],["c111",0,0,0,5.79916],["c112",0,0,0,3.58112],["c113",0,0,0,3.55516],["c114",0,0,0,3.54258],["c115",0,0,0,3.51664],["c116",0,0,0,3.4907]];
+    const DEFAULT_BRANCH_OVERRIDE_BY_ID = new Map(DEFAULT_BRANCH_LAYOUT.map(([id,rx,ry,rz,length])=>[id,{rx,ry,rz,length}]));
+    const el = Object.fromEntries(["app","summary","play","labels","reset","flat-graph","growth-animation","rotate-camera","branches-only","export-layout","import-layout","layout-file","scene","tree","guides","edges","nodes","edge-labels","avatars","branch-editor","branch-title","branch-close","branch-x","branch-y","branch-z","branch-length","branch-reset","panel","previous","groups","next","all","branch-status","error","error-detail"].map(id => [id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()), document.getElementById(id)]));
+    const s = { movements:[], movementById:new Map(), nodes:new Map(), positions:new Map(), basePositions:new Map(), flatPositions:new Map(), growthTargetPositions:new Map(), headings:new Map(), children:new Map(), targets:new Map(), depths:new Map(), leaderChildByParent:new Map(), trunkChildByParent:new Map(), trunkSideByNode:new Map(), launchAzimuthByNode:new Map(), launchVectorByNode:new Map(), fibonacciPhaseByNode:new Map(), branchOverrides:new Map(), branchById:new Map(), selectedBranch:null, branchesOnly:false, flatMode:false, growthActive:false, growthProgress:1, trunkTip:null, tipPositions:[], leafOrder:[], maxDepth:0, maxHeight:1, clusters:[], clusterByMovement:new Map(), clusterByNode:new Map(), edgeItems:[], edgeLabelItems:[], nodeItems:[], guideItems:[], avatars:[], loaded:0, failed:0, playing:true, labels:true, selected:null, active:-1, yaw:DEFAULT_YAW, pitch:-.3, zoom:1, fitBase:1, width:1, height:1, pointer:null, px:0, py:0, root:null, projectionFrame:null, trackingFrame:null, cameraRotationFrame:null, growthFrame:null, orbitFrame:null, orbitLast:0 };
 
     bind();
     initialize();
@@ -144,13 +194,18 @@
         if (!response.ok) throw new Error(`embedding.json returned ${response.status}`);
         const data = await response.json();
         s.movements = data.movements;
+        s.leafOrder = data.lineage_tree.leaf_order.slice();
         s.movementById = new Map(s.movements.map(m => [m.id,m]));
         s.nodes = new Map(data.lineage_tree.nodes.map(n => [n.id,n]));
         s.root = data.lineage_tree.root;
         makeClusters(data.lineage_tree);
         makePositions(data.lineage_tree);
+        s.basePositions = new Map(Array.from(s.positions,([id,p])=>[id,{...p}]));
         makeGuides();
         makeTree();
+        applyDefaultBranchLayout();
+        recomputeBranchGeometry();
+        makeFlatPositions(data.lineage_tree);
         makeGroupButtons();
         resize();
         el.summary.innerHTML = "<strong>Tree ready</strong> · preparing 59 avatars";
@@ -176,9 +231,21 @@
       el.play.addEventListener("click", togglePlay);
       el.labels.addEventListener("click", toggleLabels);
       el.reset.addEventListener("click", reset);
+      el.flatGraph.addEventListener("click",showFlatGraph);
+      el.growthAnimation.addEventListener("click",playGrowthAnimation);
+      el.rotateCamera.addEventListener("click",rotate90);
+      el.branchesOnly.addEventListener("click",toggleBranchesOnly);
+      el.exportLayout.addEventListener("click",exportLayout);
+      el.importLayout.addEventListener("click",()=>el.layoutFile.click());
+      el.layoutFile.addEventListener("change",importLayout);
       el.previous.addEventListener("click", () => step(-1));
       el.next.addEventListener("click", () => step(1));
       el.all.addEventListener("click", () => activate(-1));
+      [el.branchX,el.branchY,el.branchZ,el.branchLength].forEach(input=>input.addEventListener("input",editSelectedBranch));
+      el.branchReset.addEventListener("click",resetSelectedBranch);
+      el.branchClose.addEventListener("click",closeBranchEditor);
+      el.branchEditor.addEventListener("pointerdown",event=>event.stopPropagation());
+      el.branchEditor.addEventListener("wheel",event=>event.stopPropagation(),{passive:true});
       el.scene.addEventListener("pointerdown", down);
       el.scene.addEventListener("pointermove", move);
       el.scene.addEventListener("pointerup", up);
@@ -301,17 +368,27 @@
       s.tipPositions=tree.leaf_order.map(id=>s.positions.get(`m${id}`));s.maxHeight=Math.max(...s.tipPositions.map(p=>p.y));
     }
 
+    function makeFlatPositions(tree){
+      const orderIndex=new Map(tree.leaf_order.map((id,index)=>[id,index])),step=Math.PI*2/tree.leaf_order.length,outerRadius=21;
+      s.flatPositions=new Map();
+      s.nodes.forEach(node=>{const indices=node.members.map(id=>orderIndex.get(id)),meanIndex=indices.reduce((sum,value)=>sum+value,0)/indices.length,angle=-Math.PI/2+meanIndex*step,radius=node.type==="movement"?outerRadius:(1-node.height/tree.max_height)*outerRadius;s.flatPositions.set(node.id,{x:Math.cos(angle)*radius,y:-Math.sin(angle)*radius,z:0});});
+    }
+
     function makeGuides() {
-      const crown=smoothHull(convexHull(s.tipPositions),2);
       [0,.25,.5,.75,1].forEach((progress,i)=>{
-        const spread=progress===0?.06:Math.pow(progress,.9),height=progress*s.maxHeight,points=crown.map(p=>({x:p.x*spread,y:height,z:p.z*spread}));points.push({...points[0]});
-        const path=document.createElementNS(NS,"path");path.setAttribute("class",`guide${i===0?" ground":""}`);el.guides.appendChild(path);s.guideItems.push({path,points});
+        const path=document.createElementNS(NS,"path");path.setAttribute("class",`guide${i===0?" ground":""}`);el.guides.appendChild(path);s.guideItems.push({path,progress,points:[]});
       });
+      updateGuideGeometry();
+    }
+
+    function updateGuideGeometry(){
+      const crown=smoothHull(convexHull(s.tipPositions),2);
+      s.guideItems.forEach(item=>{const spread=item.progress===0?.06:Math.pow(item.progress,.9),height=item.progress*s.maxHeight;item.points=crown.map(p=>({x:p.x*spread,y:height,z:p.z*spread}));if(item.points.length)item.points.push({...item.points[0]});});
     }
 
     function makeTree() {
       s.nodes.forEach(n=>{
-        if(n.parent){const c=s.clusterByNode.get(n.id),line=document.createElementNS(NS,"path"),width=2+4.2*Math.sqrt(n.members.length/s.movements.length),isTrunk=s.trunkChildByParent.get(n.parent)===n.id,isTopFork=n.parent===s.trunkTip,isLeader=isTopFork||s.leaderChildByParent.get(n.parent)===n.id,depth=s.depths.get(n.id),isStraightStem=isTrunk&&depth<=STRAIGHT_TRUNK_LEVELS,a=s.positions.get(n.parent),b=s.positions.get(n.id);line.setAttribute("class","edge");line.dataset.trunk=String(isTrunk);line.dataset.depth=String(depth);line.style.setProperty("--color",isStraightStem?"#8c8c8c":(c?.color||"#8c8c8c"));line.style.setProperty("--width",`${width.toFixed(2)}px`);el.edges.appendChild(line);s.edgeItems.push({id:n.id,line,points:curvePoints(a,b,n.id,isTrunk,depth,isLeader,s.headings.get(n.parent),s.headings.get(n.id))});}
+        if(n.parent){const c=s.clusterByNode.get(n.id),line=document.createElementNS(NS,"path"),label=document.createElementNS(NS,"text"),number=s.edgeItems.length+1,width=2+4.2*Math.sqrt(n.members.length/s.movements.length),isTrunk=s.trunkChildByParent.get(n.parent)===n.id,isTopFork=n.parent===s.trunkTip,isLeader=isTopFork||s.leaderChildByParent.get(n.parent)===n.id,depth=s.depths.get(n.id),isStraightStem=isTrunk&&depth<=STRAIGHT_TRUNK_LEVELS,a=s.positions.get(n.parent),b=s.positions.get(n.id),baseLength=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z);line.setAttribute("class","edge");line.dataset.trunk=String(isTrunk);line.dataset.depth=String(depth);line.style.setProperty("--color",isStraightStem?"#8c8c8c":(c?.color||"#8c8c8c"));line.style.setProperty("--width",`${width.toFixed(2)}px`);line.addEventListener("pointerdown",event=>event.stopPropagation());line.addEventListener("click",event=>{event.stopPropagation();selectBranch(n.id);});el.edges.appendChild(line);label.setAttribute("class","edge-label");label.textContent=String(number);label.setAttribute("aria-label",`Edit branch ${number}`);label.addEventListener("pointerdown",event=>event.stopPropagation());label.addEventListener("click",event=>{event.stopPropagation();selectBranch(n.id);});el.edgeLabels.appendChild(label);const item={id:n.id,parentId:n.parent,number,line,label,baseLength,isTrunk,depth,isLeader,points:curvePoints(a,b,n.id,isTrunk,depth,isLeader,s.headings.get(n.parent),s.headings.get(n.id))};s.edgeItems.push(item);s.edgeLabelItems.push(item);s.branchById.set(n.id,item);}
         const c=s.clusterByNode.get(n.id),circle=document.createElementNS(NS,"circle");circle.setAttribute("class","node");circle.style.setProperty("--color",n.id===s.root?"#fff":(c?.color||"#8c8c8c"));el.nodes.appendChild(circle);s.nodeItems.push({id:n.id,circle,p:s.positions.get(n.id),r:n.id===s.root?5:(n.type==="movement"?3:3.6),root:n.id===s.root});
       });
     }
@@ -346,22 +423,66 @@
       s.fitBase=fittedBase();
       s.guideItems.forEach(g=>g.path.setAttribute("d",g.points.map((p,i)=>{const q=project(p);return`${i?"L":"M"}${round(q.x)} ${round(q.y)}`;}).join(" ")));
       s.edgeItems.forEach(e=>e.line.setAttribute("d",e.points.map((p,i)=>{const q=project(p);return`${i?"L":"M"}${round(q.x)} ${round(q.y)}`;}).join(" ")));
+      s.edgeLabelItems.forEach(item=>{const q=project(item.points[Math.floor(item.points.length/2)]);item.label.setAttribute("x",round(q.x));item.label.setAttribute("y",round(q.y));});
       s.nodeItems.forEach(n=>{const q=project(n.p);n.circle.setAttribute("cx",round(q.x));n.circle.setAttribute("cy",round(q.y));n.circle.setAttribute("r",round(n.r*clamp(q.scale,.68,1.25)));});
-      s.avatars.forEach(a=>{const q=project(a.p),visible=q.x>-80&&q.x<s.width+80&&q.y>-120&&q.y<s.height+120&&q.depth>-CAMERA+2;a.button.classList.toggle("offscreen",!visible);if(!visible)return;const scale=clamp((.96+(q.scale-1)*.32)*(.9+s.zoom*.1),.88,1.12);a.button.style.left=`${round(q.x)}px`;a.button.style.top=`${round(q.y-42*scale)}px`;a.button.style.setProperty("--scale",scale.toFixed(3));a.button.style.zIndex=String(1000-Math.round(q.depth*10));});
+      s.avatars.forEach(a=>{const q=project(s.growthActive||s.flatMode?growthAvatarPosition(a):a.p),visible=q.x>-80&&q.x<s.width+80&&q.y>-120&&q.y<s.height+120&&q.depth>-CAMERA+2;a.button.classList.toggle("offscreen",!visible);if(!visible)return;const scale=clamp((.96+(q.scale-1)*.32)*(.9+s.zoom*.1),.88,1.12);a.button.style.left=`${round(q.x)}px`;a.button.style.top=`${round(q.y-42*scale)}px`;a.button.style.setProperty("--scale",scale.toFixed(3));a.button.style.zIndex=String(1000-Math.round(q.depth*10));});
     }
     function fittedBase(){
-      const natural=Math.min(s.width/48,Math.max(7.2,(s.height-160)/46)),cy=Math.cos(s.yaw),sy=Math.sin(s.yaw),cp=Math.cos(s.pitch),sp=Math.sin(s.pitch),points=s.nodeItems.length?s.nodeItems.map(item=>item.p):Array.from(s.positions.values());let maxX=1,maxUp=1,maxDown=0;
+      const natural=Math.min(s.width/48,Math.max(7.2,(s.height-160)/46)),cy=Math.cos(s.yaw),sy=Math.sin(s.yaw),cp=Math.cos(s.pitch),sp=Math.sin(s.pitch),points=s.nodeItems.length?s.nodeItems.map(item=>item.p):Array.from(s.positions.values()),anchor=viewAnchorY();let maxX=1,maxUp=1,maxDown=0;
       points.forEach(p=>{const x=p.x*cy-p.z*sy,z=p.x*sy+p.z*cy,y=p.y*cp-z*sp,depth=p.y*sp+z*cp,perspective=clamp(CAMERA/(CAMERA+depth),.52,1.7),px=Math.abs(x*perspective),py=y*perspective;maxX=Math.max(maxX,px);maxUp=Math.max(maxUp,py);maxDown=Math.max(maxDown,-py);});
-      const widthLimit=Math.max(6,(s.width/2-150)/maxX),topLimit=Math.max(6,(s.height*.92-100)/maxUp),bottomLimit=maxDown>.01?Math.max(6,(s.height*.08-24)/maxDown):Infinity;
+      const widthLimit=Math.max(2.5,(s.width/2-150)/maxX),topLimit=Math.max(2.5,(anchor-150)/maxUp),bottomLimit=maxDown>.01?Math.max(2.5,(s.height-anchor-24)/maxDown):Infinity;
       return Math.min(natural,widthLimit,topLimit,bottomLimit);
     }
-    function project(p){const cy=Math.cos(s.yaw),sy=Math.sin(s.yaw),x=p.x*cy-p.z*sy,z=p.x*sy+p.z*cy,cp=Math.cos(s.pitch),sp=Math.sin(s.pitch),y=p.y*cp-z*sp,depth=p.y*sp+z*cp,perspective=clamp(CAMERA/(CAMERA+depth),.52,1.7),base=s.fitBase*s.zoom;return{x:s.width/2+x*base*perspective,y:s.height*.92-y*base*perspective,depth,scale:perspective};}
+    function viewAnchorY(){return s.height*(.5+.42*s.growthProgress);}
+    function project(p){const cy=Math.cos(s.yaw),sy=Math.sin(s.yaw),x=p.x*cy-p.z*sy,z=p.x*sy+p.z*cy,cp=Math.cos(s.pitch),sp=Math.sin(s.pitch),y=p.y*cp-z*sp,depth=p.y*sp+z*cp,perspective=clamp(CAMERA/(CAMERA+depth),.52,1.7),base=s.fitBase*s.zoom;return{x:s.width/2+x*base*perspective,y:viewAnchorY()-y*base*perspective,depth,scale:perspective};}
 
-    function down(event){if(event.button!==0||event.target.closest("button,a"))return;s.pointer=event.pointerId;s.px=event.clientX;s.py=event.clientY;el.scene.setPointerCapture?.(event.pointerId);el.scene.classList.add("rotating");}
+    function refreshAnimatedGeometry(){
+      s.edgeItems.forEach(edge=>{edge.points=s.flatMode?flatEdgePoints(edge):(s.growthActive?growthEdgePoints(edge,s.growthProgress):[s.positions.get(edge.parentId),s.positions.get(edge.id)]);});s.tipPositions=s.leafOrder.map(id=>s.positions.get(`m${id}`));s.maxHeight=Math.max(...s.tipPositions.map(p=>p.y));if(!s.growthActive&&!s.flatMode)updateGuideGeometry();requestProjection();
+    }
+    function growthNodeProgress(id,progress){
+      const members=Math.max(1,s.nodes.get(id)?.members?.length||1),hierarchy=Math.log(members)/Math.log(Math.max(2,s.movements.length)),delay=.52*Math.pow(hierarchy,.8);
+      return smoothStep(clamp((progress-delay)/.48,0,1));
+    }
+    function setGrowthPositions(progress){
+      s.positions.forEach((position,id)=>{const flat=s.flatPositions.get(id),target=s.growthTargetPositions.get(id);if(!flat||!target)return;const local=growthNodeProgress(id,progress);position.x=flat.x+(target.x-flat.x)*local;position.y=flat.y+(target.y-flat.y)*local;position.z=flat.z+(target.z-flat.z)*local;});refreshAnimatedGeometry();
+    }
+    function flatEdgePoints(edge){
+      const a=s.flatPositions.get(edge.parentId),b=s.flatPositions.get(edge.id),count=14;if(!a||!b)return[a,b].filter(Boolean);const parentRadius=Math.hypot(a.x,a.y),parentAngle=Math.atan2(-a.y,a.x),childAngle=Math.atan2(-b.y,b.x);if(parentRadius<.001)return Array.from({length:count+1},(_,index)=>{const t=index/count;return{x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:0};});const delta=Math.atan2(Math.sin(childAngle-parentAngle),Math.cos(childAngle-parentAngle)),points=Array.from({length:count},(_,index)=>{const t=index/(count-1),angle=parentAngle+delta*t;return{x:Math.cos(angle)*parentRadius,y:-Math.sin(angle)*parentRadius,z:0};});points.push({...b});return points;
+    }
+    function growthEdgePoints(edge,progress){
+      const flat=flatEdgePoints(edge),targetA=s.growthTargetPositions.get(edge.parentId),targetB=s.growthTargetPositions.get(edge.id),parentMix=growthNodeProgress(edge.parentId,progress),tipMix=growthNodeProgress(edge.id,progress);if(!targetA||!targetB)return[s.positions.get(edge.parentId),s.positions.get(edge.id)];const points=flat.map((point,index)=>{const t=index/(flat.length-1),mix=parentMix+(tipMix-parentMix)*smoothStep(t),target={x:targetA.x+(targetB.x-targetA.x)*t,y:targetA.y+(targetB.y-targetA.y)*t,z:targetA.z+(targetB.z-targetA.z)*t};return{x:point.x+(target.x-point.x)*mix,y:point.y+(target.y-point.y)*mix,z:point.z+(target.z-point.z)*mix};});points[0]=s.positions.get(edge.parentId);points[points.length-1]=s.positions.get(edge.id);return points;
+    }
+    function growthAvatarPosition(item){
+      const id=`m${item.m.id}`,flat=s.flatPositions.get(id),target=s.growthTargetPositions.get(id);if(!flat||!target)return item.p;const local=growthNodeProgress(id,s.growthProgress);return{x:flat.x+(target.x-flat.x)*local,y:flat.y+(target.y-flat.y)*local,z:flat.z+(target.z-flat.z)*local};
+    }
+    function lockGrowthControls(locked){el.app.querySelectorAll(".actions button").forEach(button=>{button.disabled=locked;});}
+    function showFlatGraph(){
+      if(s.flatMode){stopOrbit();s.yaw=0;s.pitch=0;s.zoom=1;requestProjection();return;}if(s.growthActive)finishGrowth(false);stopOrbit();if(s.cameraRotationFrame){cancelAnimationFrame(s.cameraRotationFrame);s.cameraRotationFrame=null;}if(s.branchesOnly)toggleBranchesOnly();if(!s.labels)toggleLabels();closeBranchEditor();s.growthTargetPositions=new Map(Array.from(s.positions,([id,p])=>[id,{...p}]));s.flatMode=true;s.growthProgress=0;el.app.classList.add("flat-view");el.flatGraph.setAttribute("aria-pressed","true");el.growthAnimation.textContent="Animate 2D → 3D";el.exportLayout.disabled=true;el.importLayout.disabled=true;s.positions.forEach((position,id)=>{const flat=s.flatPositions.get(id);if(flat)Object.assign(position,flat);});s.yaw=0;s.pitch=0;s.zoom=1;refreshAnimatedGeometry();el.summary.textContent="Flat circular lineage · ready to grow into 3D";
+    }
+    function playGrowthAnimation(){
+      if(!s.flatPositions.size||!s.positions.size)return;if(s.growthActive)finishGrowth(false);stopOrbit();if(s.cameraRotationFrame){cancelAnimationFrame(s.cameraRotationFrame);s.cameraRotationFrame=null;}if(s.branchesOnly)toggleBranchesOnly();if(!s.labels)toggleLabels();closeBranchEditor();if(!s.flatMode)s.growthTargetPositions=new Map(Array.from(s.positions,([id,p])=>[id,{...p}]));s.flatMode=false;el.app.classList.remove("flat-view");el.flatGraph.setAttribute("aria-pressed","false");s.growthActive=true;s.growthProgress=0;el.app.classList.add("growing");el.growthAnimation.textContent="Growing…";lockGrowthControls(true);s.yaw=0;s.pitch=0;s.zoom=1;setGrowthPositions(0);el.summary.textContent="Flat 2D lineage · growing into 3D";
+      if(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches){finishGrowth(false);return;}
+      const started=performance.now(),hold=1400,duration=11000,tick=now=>{const elapsed=now-started,linear=clamp((elapsed-hold)/duration,0,1);s.growthProgress=linear;s.yaw=elapsed*.000035;s.pitch=-.3*linear;setGrowthPositions(linear);if(linear<1)s.growthFrame=requestAnimationFrame(tick);else finishGrowth(true);};s.growthFrame=requestAnimationFrame(tick);
+    }
+    function finishGrowth(beginOrbit){
+      if(s.growthFrame)cancelAnimationFrame(s.growthFrame);s.growthFrame=null;if(s.growthTargetPositions.size)s.positions.forEach((position,id)=>{const target=s.growthTargetPositions.get(id);if(target)Object.assign(position,target);});s.growthActive=false;s.flatMode=false;s.growthProgress=1;el.app.classList.remove("growing","flat-view");el.flatGraph.setAttribute("aria-pressed","false");lockGrowthControls(false);el.growthAnimation.textContent="Replay 2D → 3D";refreshAnimatedGeometry();el.summary.textContent="3D tree restored · slow camera orbit";if(beginOrbit)startOrbit();
+    }
+    function startOrbit(){
+      if(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)return;stopOrbit();s.orbitLast=performance.now();const tick=now=>{const elapsed=Math.min(64,now-s.orbitLast);s.orbitLast=now;s.yaw+=elapsed*.000035;requestProjection();s.orbitFrame=requestAnimationFrame(tick);};s.orbitFrame=requestAnimationFrame(tick);
+    }
+    function stopOrbit(){if(s.orbitFrame)cancelAnimationFrame(s.orbitFrame);s.orbitFrame=null;s.orbitLast=0;}
+
+    function down(event){if(event.button!==0||event.target.closest("button,a"))return;if(s.growthActive)finishGrowth(false);stopOrbit();if(s.cameraRotationFrame){cancelAnimationFrame(s.cameraRotationFrame);s.cameraRotationFrame=null;}s.pointer=event.pointerId;s.px=event.clientX;s.py=event.clientY;el.scene.setPointerCapture?.(event.pointerId);el.scene.classList.add("rotating");}
     function move(event){if(s.pointer!==event.pointerId)return;s.yaw+=(event.clientX-s.px)*.007;s.pitch=clamp(s.pitch+(event.clientY-s.py)*.0045,-.62,.42);s.px=event.clientX;s.py=event.clientY;requestProjection();}
     function up(event){if(s.pointer!==event.pointerId)return;el.scene.releasePointerCapture?.(event.pointerId);el.scene.classList.remove("rotating");s.pointer=null;}
-    function wheel(event){if(event.target.closest("button,a"))return;event.preventDefault();s.zoom=clamp(s.zoom*Math.exp(-event.deltaY*.0012),.55,2.3);requestProjection();}
-    function reset(){s.yaw=DEFAULT_YAW;s.pitch=-.3;s.zoom=1;requestProjection();}
+    function wheel(event){if(event.target.closest("button,a"))return;if(s.growthActive)finishGrowth(false);stopOrbit();event.preventDefault();s.zoom=clamp(s.zoom*Math.exp(-event.deltaY*.0012),.55,2.3);requestProjection();}
+    function reset(){if(s.growthActive)finishGrowth(false);stopOrbit();if(s.cameraRotationFrame){cancelAnimationFrame(s.cameraRotationFrame);s.cameraRotationFrame=null;}if(s.flatMode){s.yaw=0;s.pitch=0;s.zoom=1;requestProjection();return;}s.yaw=DEFAULT_YAW;s.pitch=-.3;s.zoom=1;requestProjection();}
+    function rotate90(){
+      if(s.growthActive)finishGrowth(false);stopOrbit();if(s.cameraRotationFrame)cancelAnimationFrame(s.cameraRotationFrame);const start=s.yaw,target=start+Math.PI/2,reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;if(reduced){s.yaw=target;requestProjection();return;}const started=performance.now(),duration=520,tick=now=>{const progress=clamp((now-started)/duration,0,1),eased=progress<.5?2*progress*progress:1-Math.pow(-2*progress+2,2)/2;s.yaw=start+(target-start)*eased;requestProjection();if(progress<1)s.cameraRotationFrame=requestAnimationFrame(tick);else{s.yaw=target;s.cameraRotationFrame=null;requestProjection();}};s.cameraRotationFrame=requestAnimationFrame(tick);
+    }
+    function toggleBranchesOnly(){
+      s.branchesOnly=!s.branchesOnly;if(s.branchesOnly&&!s.labels)toggleLabels();el.app.classList.toggle("branches-only",s.branchesOnly);el.branchesOnly.setAttribute("aria-pressed",String(s.branchesOnly));el.branchesOnly.textContent=s.branchesOnly?"Show everything":"Branches only";
+    }
 
     function select(id){s.selected=id;const m=s.movementById.get(id),c=s.clusterByMovement.get(id),depth=s.depths.get(`m${id}`);s.active=c.index;updateNav();highlight();el.panel.innerHTML=`<strong>${String(id).padStart(2,"0")} · <span lang="th">${escape(m.thai)}</span></strong><span>${escape(m.english)} · ${depth} branching steps from the shared root</span>`;}
     function activate(index){s.active=index<0?-1:(index+s.clusters.length)%s.clusters.length;s.selected=null;updateNav();highlight();const c=s.clusters[s.active];el.panel.innerHTML=c?`<strong>Branch group ${c.label}</strong><span>${c.members.length} observed movements branching from the tree-like backbone</span>`:"<strong>Tree-like organic lineage</strong><span>Ten-level vertical trunk · strongly separated organic crown · drag to rotate</span>";}
@@ -369,6 +490,39 @@
     function updateNav(){const c=s.clusters[s.active]||null;el.groups.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.index)===s.active)));el.all.setAttribute("aria-pressed",String(!c));el.all.style.setProperty("--group-color","#fff");el.branchStatus.textContent=c?`Group ${c.label} · ${c.members.length} dances`:"All branches";}
     function pathFor(id){const set=new Set();let n=id==null?null:s.nodes.get(`m${id}`);while(n?.parent){set.add(n.id);n=s.nodes.get(n.parent);}return set;}
     function highlight(){const c=s.clusters[s.active]||null,path=pathFor(s.selected);s.edgeItems.forEach(e=>{const p=path.has(e.id),g=!!c?.path.has(e.id);e.line.style.setProperty("--active",c?.color||"#fff");e.line.classList.toggle("path",p);e.line.classList.toggle("group",g);e.line.classList.toggle("muted",!!c&&!g&&!p);});s.nodeItems.forEach(n=>{const p=path.has(n.id)||(s.selected!=null&&n.root),g=!!c&&(c.path.has(n.id)||n.root);n.circle.style.setProperty("--active",c?.color||"#fff");n.circle.classList.toggle("path",p);n.circle.classList.toggle("group",g);n.circle.classList.toggle("muted",!!c&&!g&&!p);});s.avatars.forEach(a=>{a.button.classList.toggle("selected",a.m.id===s.selected);a.button.classList.toggle("muted",!!c&&a.c!==c);});}
+
+    function selectBranch(id){
+      const item=s.branchById.get(id);if(!item)return;s.selectedBranch=id;const override=s.branchOverrides.get(id)||{rx:0,ry:0,rz:0,length:item.baseLength};
+      el.branchTitle.textContent=`Branch ${String(item.number).padStart(3,"0")}`;el.branchX.value=round(override.rx);el.branchY.value=round(override.ry);el.branchZ.value=round(override.rz);el.branchLength.value=override.length.toFixed(2);el.branchEditor.hidden=false;
+      s.edgeItems.forEach(edge=>edge.line.classList.toggle("editing",edge.id===id));s.edgeLabelItems.forEach(edge=>edge.label.classList.toggle("selected",edge.id===id));
+    }
+    function applyDefaultBranchLayout(){
+      s.branchOverrides=new Map(Array.from(DEFAULT_BRANCH_OVERRIDE_BY_ID,([id,override])=>s.branchById.has(id)?[id,{...override}]:null).filter(Boolean));
+    }
+    function editSelectedBranch(){
+      const item=s.branchById.get(s.selectedBranch);if(!item)return;const previous=s.branchOverrides.get(item.id)||{rx:0,ry:0,rz:0,length:item.baseLength},read=(input,fallback)=>Number.isFinite(input.valueAsNumber)?input.valueAsNumber:fallback;
+      s.branchOverrides.set(item.id,{rx:read(el.branchX,previous.rx),ry:read(el.branchY,previous.ry),rz:read(el.branchZ,previous.rz),length:Math.max(.1,read(el.branchLength,previous.length))});recomputeBranchGeometry();
+    }
+    function resetSelectedBranch(){
+      const item=s.branchById.get(s.selectedBranch);if(!item)return;const saved=DEFAULT_BRANCH_OVERRIDE_BY_ID.get(item.id);if(saved)s.branchOverrides.set(item.id,{...saved});else s.branchOverrides.delete(item.id);selectBranch(item.id);recomputeBranchGeometry();
+    }
+    function closeBranchEditor(){
+      s.selectedBranch=null;el.branchEditor.hidden=true;s.edgeItems.forEach(edge=>edge.line.classList.remove("editing"));s.edgeLabelItems.forEach(edge=>edge.label.classList.remove("selected"));
+    }
+    function recomputeBranchGeometry(){
+      const identity=[1,0,0,0,1,0,0,0,1],matrices=new Map([[s.root,identity]]),queue=[s.root];
+      while(queue.length){const parentId=queue.shift(),parent=s.positions.get(parentId),parentMatrix=matrices.get(parentId)||identity;(s.children.get(parentId)||[]).forEach(childId=>{const baseParent=s.basePositions.get(parentId),baseChild=s.basePositions.get(childId),edge=s.branchById.get(childId);if(!baseParent||!baseChild||!edge)return;const override=s.branchOverrides.get(childId)||{rx:0,ry:0,rz:0,length:edge.baseLength},matrix=multiply3(parentMatrix,rotationMatrix(override.rx,override.ry,override.rz)),baseVector={x:baseChild.x-baseParent.x,y:baseChild.y-baseParent.y,z:baseChild.z-baseParent.z},direction=normalize3(apply3(matrix,baseVector)),child=s.positions.get(childId);child.x=parent.x+direction.x*override.length;child.y=parent.y+direction.y*override.length;child.z=parent.z+direction.z*override.length;matrices.set(childId,matrix);queue.push(childId);});}
+      s.headings.set(s.root,{x:0,y:1,z:0});s.nodes.forEach(node=>{if(!node.parent)return;const parent=s.positions.get(node.parent),child=s.positions.get(node.id);s.headings.set(node.id,normalize3({x:child.x-parent.x,y:child.y-parent.y,z:child.z-parent.z}));});
+      s.edgeItems.forEach(edge=>{const a=s.positions.get(edge.parentId),b=s.positions.get(edge.id);edge.points=curvePoints(a,b,edge.id,edge.isTrunk,edge.depth,edge.isLeader,s.headings.get(edge.parentId),s.headings.get(edge.id));});s.tipPositions=s.leafOrder.map(id=>s.positions.get(`m${id}`));s.maxHeight=Math.max(...s.tipPositions.map(p=>p.y));updateGuideGeometry();requestProjection();
+    }
+    function exportLayout(){
+      const position=p=>({x:roundTo(p.x,5),y:roundTo(p.y,5),z:roundTo(p.z,5)}),branches=s.edgeItems.map(edge=>{const override=s.branchOverrides.get(edge.id)||{rx:0,ry:0,rz:0,length:edge.baseLength};return{id:edge.id,number:edge.number,parent:edge.parentId,rotation:{x:roundTo(override.rx,4),y:roundTo(override.ry,4),z:roundTo(override.rz,4)},length:roundTo(override.length,5),start:position(s.positions.get(edge.parentId)),end:position(s.positions.get(edge.id))};}),nodes=Array.from(s.positions,([id,p])=>({id,...position(p)})),payload={schema:"cybersubin-branch-layout/v1",exported_at:new Date().toISOString(),source:"evolution-tree-3d.html",camera:{yaw:roundTo(s.yaw,6),pitch:roundTo(s.pitch,6),zoom:roundTo(s.zoom,6)},branches,nodes};
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),link=document.createElement("a"),stamp=payload.exported_at.replace(/[:.]/g,"-");link.href=url;link.download=`cybersubin-branch-layout-${stamp}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);el.summary.textContent=`Exported ${branches.length} branch positions`;
+    }
+    async function importLayout(){
+      const file=el.layoutFile.files?.[0];if(!file)return;
+      try{const payload=JSON.parse(await file.text());if(!Array.isArray(payload.branches))throw new Error("Layout file has no branches");const next=new Map();payload.branches.forEach(saved=>{const edge=s.branchById.get(saved.id),rotation=saved.rotation||{};if(!edge)return;const rx=Number(rotation.x),ry=Number(rotation.y),rz=Number(rotation.z),length=Number(saved.length);if([rx,ry,rz,length].every(Number.isFinite)&&length>.05)next.set(edge.id,{rx,ry,rz,length});});if(!next.size)throw new Error("No matching branch positions were found");s.branchOverrides=next;if(payload.camera&&[payload.camera.yaw,payload.camera.pitch,payload.camera.zoom].every(Number.isFinite)){s.yaw=payload.camera.yaw;s.pitch=clamp(payload.camera.pitch,-.62,.42);s.zoom=clamp(payload.camera.zoom,.55,2.3);}recomputeBranchGeometry();if(s.selectedBranch)selectBranch(s.selectedBranch);el.summary.textContent=`Loaded ${next.size} branch positions from ${file.name}`;}catch(error){console.error(error);el.summary.textContent=`Could not load layout: ${error.message||error}`;}finally{el.layoutFile.value="";}
+    }
 
     function startTracking(){const tick=()=>{if(s.playing)s.avatars.forEach(center);s.trackingFrame=requestAnimationFrame(tick);};s.trackingFrame=requestAnimationFrame(tick);}
     function center(item,force=false){const centers=item.m.skeleton?.center_track,duration=item.viewer.duration;if(!centers?.length||!Number.isFinite(duration)||duration<=0)return;const progress=((item.viewer.currentTime%duration)+duration)%duration/duration,index=Math.min(centers.length-1,Math.round(progress*(centers.length-1)));if(!force&&index===item.centerIndex)return;item.centerIndex=index;const [x,y,z]=centers[index];item.viewer.setAttribute("camera-target",`${x}m ${y}m ${z}m`);item.viewer.jumpCameraToGoal?.();}
@@ -386,12 +540,12 @@
       let result=points.slice();for(let k=0;k<iterations;k++){const next=[];result.forEach((p,i)=>{const q=result[(i+1)%result.length];next.push({x:p.x*.75+q.x*.25,z:p.z*.75+q.z*.25},{x:p.x*.25+q.x*.75,z:p.z*.25+q.z*.75});});result=next;}return result;
     }
     function curvePoints(a,b,id,isTrunk,depth,isLeader,parentHeading,childHeading){
-      if(isTrunk&&depth<=STRAIGHT_TRUNK_LEVELS)return[a,b];
-      const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,length=Math.hypot(dx,dy,dz),chord=normalize3({x:dx,y:dy,z:dz}),incoming=normalize3(parentHeading||{x:0,y:1,z:0}),emergence=isLeader?.62:.3,start=normalize3({x:incoming.x*emergence+chord.x*(1-emergence),y:incoming.y*emergence+chord.y*(1-emergence),z:incoming.z*emergence+chord.z*(1-emergence)}),horizontal=Math.hypot(dx,dz),fallback=organic(`curve-axis-${id}`),perpX=horizontal>.001?-dz/horizontal:fallback.x,perpZ=horizontal>.001?dx/horizontal:fallback.z,sign=hash01(`curve-side-${id}`)<.5?-1:1,bend=length*(isTrunk?.035:.07+.07*hash01(`curve-size-${id}`))*sign,lift=length*(.025+.035*hash01(`curve-lift-${id}`)),c1={x:a.x+start.x*length*.34+perpX*bend,y:a.y+start.y*length*.34+lift,z:a.z+start.z*length*.34+perpZ*bend},c2={x:b.x-chord.x*length*.31+perpX*bend*.45,y:b.y-chord.y*length*.31+lift*.65,z:b.z-chord.z*length*.31+perpZ*bend*.45},points=[];
-      for(let i=0;i<=12;i++){const t=i/12,u=1-t;points.push({x:u*u*u*a.x+3*u*u*t*c1.x+3*u*t*t*c2.x+t*t*t*b.x,y:u*u*u*a.y+3*u*u*t*c1.y+3*u*t*t*c2.y+t*t*t*b.y,z:u*u*u*a.z+3*u*u*t*c1.z+3*u*t*t*c2.z+t*t*t*b.z});}
-      return points;
+      return[a,b];
     }
     function normalize3(v){const length=Math.hypot(v.x,v.y,v.z)||1;return{x:v.x/length,y:v.y/length,z:v.z/length};}
+    function rotationMatrix(rx,ry,rz){const x=rx*Math.PI/180,y=ry*Math.PI/180,z=rz*Math.PI/180,cx=Math.cos(x),sx=Math.sin(x),cy=Math.cos(y),sy=Math.sin(y),cz=Math.cos(z),sz=Math.sin(z),mx=[1,0,0,0,cx,-sx,0,sx,cx],my=[cy,0,sy,0,1,0,-sy,0,cy],mz=[cz,-sz,0,sz,cz,0,0,0,1];return multiply3(multiply3(mz,my),mx);}
+    function multiply3(a,b){return[a[0]*b[0]+a[1]*b[3]+a[2]*b[6],a[0]*b[1]+a[1]*b[4]+a[2]*b[7],a[0]*b[2]+a[1]*b[5]+a[2]*b[8],a[3]*b[0]+a[4]*b[3]+a[5]*b[6],a[3]*b[1]+a[4]*b[4]+a[5]*b[7],a[3]*b[2]+a[4]*b[5]+a[5]*b[8],a[6]*b[0]+a[7]*b[3]+a[8]*b[6],a[6]*b[1]+a[7]*b[4]+a[8]*b[7],a[6]*b[2]+a[7]*b[5]+a[8]*b[8]];}
+    function apply3(m,v){return{x:m[0]*v.x+m[1]*v.y+m[2]*v.z,y:m[3]*v.x+m[4]*v.y+m[5]*v.z,z:m[6]*v.x+m[7]*v.y+m[8]*v.z};}
     function cross3(a,b){return{x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
     function orthogonalFrame(direction){const reference=Math.abs(direction.y)<.88?{x:0,y:1,z:0}:{x:1,y:0,z:0},a=normalize3(cross3(reference,direction)),b=normalize3(cross3(direction,a));return[a,b];}
     function limitRise(direction,maxRise,key){if(direction.y<=maxRise)return direction;const horizontal=Math.hypot(direction.x,direction.z),fallback=organic(`rise-${key}`),x=horizontal>.001?direction.x/horizontal:fallback.x,z=horizontal>.001?direction.z/horizontal:fallback.z,reach=Math.sqrt(1-maxRise*maxRise);return{x:x*reach,y:maxRise,z:z*reach};}
@@ -399,7 +553,9 @@
     function organic(key){const angle=hash01(key)*Math.PI*2;return{x:Math.cos(angle),z:Math.sin(angle)};}
     function angleDelta(a,b){return Math.atan2(Math.sin(a-b),Math.cos(a-b));}
     function clamp(v,a,b){return Math.min(b,Math.max(a,v));}
+    function smoothStep(v){return v*v*(3-2*v);}
     function round(v){return Number(v.toFixed(2));}
+    function roundTo(v,places){return Number(v.toFixed(places));}
     function escape(v){return String(v).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[c]);}
   })();
   </script>
