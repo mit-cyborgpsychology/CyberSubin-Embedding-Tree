@@ -122,7 +122,7 @@
       <div id="avatars" class="avatars"></div>
       <output id="panel" class="visually-hidden" aria-live="polite">Tree-like organic lineage</output>
       <nav class="branch-nav" aria-label="Branch navigation"><span>Highlight branch</span><button id="previous" type="button" aria-label="Previous branch">←</button><div id="groups" class="groups"></div><button id="next" type="button" aria-label="Next branch">→</button><button id="all" type="button" aria-pressed="true">All</button><output id="branch-status">All branches</output></nav>
-      <p class="note">The crown opens from a balanced top fork; leader branches flow continuously while lateral growth peels outward.</p>
+      <p class="note">The crown rises and fans around the trunk; leaders arc upward while lateral growth spirals into three-dimensional space.</p>
     </section>
     <div id="error" class="error" hidden><strong>The hierarchy could not load.</strong><span id="error-detail"></span></div>
   </main>
@@ -130,10 +130,10 @@
   (() => {
     "use strict";
     const NS = "http://www.w3.org/2000/svg";
-    const BASE_LENGTH = 1.65, HORIZONTAL_SPREAD = 1.82, STRAIGHT_TRUNK_LEVELS = 10, GOLDEN_ANGLE = Math.PI*(3-Math.sqrt(5)), DEPTH_FAN = .62, TOP_DEPTH_TWIST = .48, DEFAULT_YAW = -.56, DISPLAY_RIGHT_AZIMUTH = -DEFAULT_YAW, CANOPY_X = 19, CANOPY_Z = 15.5, CAMERA = 140, SPEED = 3;
+    const BASE_LENGTH = 1.78, CROWN_SCALE = 2.5, LOWER_SHOOT_SCALE = 1.6, STRAIGHT_TRUNK_LEVELS = 10, FORK_BALANCE = .65, GOLDEN_ANGLE = Math.PI*(3-Math.sqrt(5)), TOP_BRANCH_STEP = Math.PI/4, TOP_BRANCH_ELEVATION = Math.SQRT1_2, DEFAULT_YAW = .225, DISPLAY_RIGHT_AZIMUTH = .56, CANOPY_X = 19, CANOPY_Z = 15.5, CAMERA = 125, SPEED = 3;
     const COLORS = ["var(--a)","var(--b)","var(--c)","var(--d)","var(--e)","var(--f)"];
     const el = Object.fromEntries(["app","summary","play","labels","reset","scene","tree","guides","edges","nodes","avatars","panel","previous","groups","next","all","branch-status","error","error-detail"].map(id => [id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()), document.getElementById(id)]));
-    const s = { movements:[], movementById:new Map(), nodes:new Map(), positions:new Map(), headings:new Map(), children:new Map(), targets:new Map(), depths:new Map(), leaderChildByParent:new Map(), trunkChildByParent:new Map(), trunkSideByNode:new Map(), trunkTip:null, tipPositions:[], maxDepth:0, maxHeight:1, clusters:[], clusterByMovement:new Map(), clusterByNode:new Map(), edgeItems:[], nodeItems:[], guideItems:[], avatars:[], loaded:0, failed:0, playing:true, labels:true, selected:null, active:-1, yaw:DEFAULT_YAW, pitch:-.18, zoom:1, width:1, height:1, pointer:null, px:0, py:0, root:null, projectionFrame:null, trackingFrame:null };
+    const s = { movements:[], movementById:new Map(), nodes:new Map(), positions:new Map(), headings:new Map(), children:new Map(), targets:new Map(), depths:new Map(), leaderChildByParent:new Map(), trunkChildByParent:new Map(), trunkSideByNode:new Map(), launchAzimuthByNode:new Map(), launchVectorByNode:new Map(), fibonacciPhaseByNode:new Map(), trunkTip:null, tipPositions:[], maxDepth:0, maxHeight:1, clusters:[], clusterByMovement:new Map(), clusterByNode:new Map(), edgeItems:[], nodeItems:[], guideItems:[], avatars:[], loaded:0, failed:0, playing:true, labels:true, selected:null, active:-1, yaw:DEFAULT_YAW, pitch:-.3, zoom:1, fitBase:1, width:1, height:1, pointer:null, px:0, py:0, root:null, projectionFrame:null, trackingFrame:null };
 
     bind();
     initialize();
@@ -203,19 +203,30 @@
 
     function makePositions(tree) {
       const maps=s.movements.map(m=>m.map),minX=Math.min(...maps.map(p=>p.x)),maxX=Math.max(...maps.map(p=>p.x)),minZ=Math.min(...maps.map(p=>p.y)),maxZ=Math.max(...maps.map(p=>p.y)),leafTargets=new Map();
-      s.children.clear();s.targets.clear();s.positions.clear();s.headings.clear();s.leaderChildByParent.clear();s.trunkSideByNode.clear();s.depths=new Map([[tree.root,0]]);
+      s.children.clear();s.targets.clear();s.positions.clear();s.headings.clear();s.leaderChildByParent.clear();s.trunkSideByNode.clear();s.launchAzimuthByNode.clear();s.launchVectorByNode.clear();s.fibonacciPhaseByNode.clear();s.depths=new Map([[tree.root,0]]);
       s.nodes.forEach(n=>{if(n.parent){if(!s.children.has(n.parent))s.children.set(n.parent,[]);s.children.get(n.parent).push(n.id);}});
       const depthQueue=[tree.root];
       while(depthQueue.length){const parent=depthQueue.shift(),depth=s.depths.get(parent);(s.children.get(parent)||[]).forEach(id=>{s.depths.set(id,depth+1);depthQueue.push(id);});}
       s.maxDepth=Math.max(...s.depths.values());
       s.children.forEach((children,parent)=>s.leaderChildByParent.set(parent,children.reduce((best,id)=>s.nodes.get(id).members.length>s.nodes.get(best).members.length?id:best)));
-      s.trunkChildByParent.clear();let trunkCursor=tree.root;
-      for(let level=0;level<STRAIGHT_TRUNK_LEVELS&&s.leaderChildByParent.has(trunkCursor);level++){const mainChild=s.leaderChildByParent.get(trunkCursor);s.trunkChildByParent.set(trunkCursor,mainChild);trunkCursor=mainChild;}
+      s.trunkChildByParent.clear();let trunkCursor=tree.root,trunkLevel=0;
+      while(s.leaderChildByParent.has(trunkCursor)){
+        const children=(s.children.get(trunkCursor)||[]).slice().sort((a,b)=>s.nodes.get(b).members.length-s.nodes.get(a).members.length),balanced=trunkLevel>=STRAIGHT_TRUNK_LEVELS&&children.length>1&&s.nodes.get(children[1]).members.length/s.nodes.get(children[0]).members.length>=FORK_BALANCE;
+        if(balanced)break;
+        const mainChild=s.leaderChildByParent.get(trunkCursor);s.trunkChildByParent.set(trunkCursor,mainChild);trunkCursor=mainChild;trunkLevel++;
+      }
       s.trunkTip=trunkCursor;
-      let leftWeight=0,rightWeight=0;const topChildren=(s.children.get(s.trunkTip)||[]).slice().sort((a,b)=>s.nodes.get(b).members.length-s.nodes.get(a).members.length||String(a).localeCompare(String(b)));
-      topChildren.forEach((id,index)=>{const side=index%2===0?-1:1;s.trunkSideByNode.set(id,side);side<0?leftWeight+=s.nodes.get(id).members.length:rightWeight+=s.nodes.get(id).members.length;});
-      const trunkLaterals=[];s.trunkChildByParent.forEach((mainChild,parentId)=>(s.children.get(parentId)||[]).filter(id=>id!==mainChild).forEach(id=>trunkLaterals.push({id,weight:s.nodes.get(id).members.length})));
-      trunkLaterals.sort((a,b)=>b.weight-a.weight||String(a.id).localeCompare(String(b.id))).forEach(branch=>{const side=leftWeight<=rightWeight?-1:1;s.trunkSideByNode.set(branch.id,side);side<0?leftWeight+=branch.weight:rightWeight+=branch.weight;});
+      const topChildren=(s.children.get(s.trunkTip)||[]).slice().sort((a,b)=>s.nodes.get(b).members.length-s.nodes.get(a).members.length||String(a).localeCompare(String(b)));
+      const trunkLaterals=[];s.trunkChildByParent.forEach((mainChild,parentId)=>(s.children.get(parentId)||[]).filter(id=>id!==mainChild).forEach(id=>trunkLaterals.push({id,parentId,depth:s.depths.get(id),weight:s.nodes.get(id).members.length})));
+      const crownLaunches=trunkLaterals.filter(branch=>branch.depth>STRAIGHT_TRUNK_LEVELS).concat(topChildren.map(id=>({id,parentId:s.trunkTip,depth:s.depths.get(id),weight:s.nodes.get(id).members.length}))),crownIds=new Set(crownLaunches.map(branch=>branch.id));
+      crownLaunches.sort((a,b)=>b.weight-a.weight||a.depth-b.depth||String(a.id).localeCompare(String(b.id))).forEach((branch,index)=>{
+        const azimuth=DISPLAY_RIGHT_AZIMUTH+index*TOP_BRANCH_STEP,horizontal=Math.sqrt(1-TOP_BRANCH_ELEVATION*TOP_BRANCH_ELEVATION);
+        s.launchAzimuthByNode.set(branch.id,azimuth);s.launchVectorByNode.set(branch.id,normalize3({x:Math.cos(azimuth)*horizontal,y:TOP_BRANCH_ELEVATION,z:Math.sin(azimuth)*horizontal}));s.fibonacciPhaseByNode.set(branch.id,azimuth);
+      });
+      trunkLaterals.filter(branch=>!crownIds.has(branch.id)).sort((a,b)=>a.depth-b.depth||String(a.id).localeCompare(String(b.id))).forEach((branch,index)=>{
+        const verticalProgress=branch.depth/s.maxDepth,organicJitter=.14*(hash01(`launch-${branch.id}`)-.5),azimuth=DISPLAY_RIGHT_AZIMUTH+.28+index*GOLDEN_ANGLE+.3*verticalProgress+organicJitter,elevation=.32+.2*verticalProgress+.05*(hash01(`launch-rise-${branch.id}`)-.5),horizontal=Math.sqrt(1-elevation*elevation);
+        s.launchAzimuthByNode.set(branch.id,azimuth);s.launchVectorByNode.set(branch.id,normalize3({x:Math.cos(azimuth)*horizontal,y:elevation,z:Math.sin(azimuth)*horizontal}));
+      });
       s.movements.forEach(m=>{
         const u=(m.map.x-minX)/(maxX-minX)-.5,v=(m.map.y-minZ)/(maxZ-minZ)-.5,rotation=-.13,rx=u*Math.cos(rotation)-v*Math.sin(rotation),rz=u*Math.sin(rotation)+v*Math.cos(rotation);
         leafTargets.set(m.id,{x:rx*CANOPY_X*2,z:rz*CANOPY_Z*2});
@@ -233,43 +244,56 @@
         if(!children.length)continue;
         const trunkChild=s.trunkChildByParent.get(parentId),leaderChild=s.leaderChildByParent.get(parentId),parentHorizontal=Math.hypot(parentHeading.x,parentHeading.z);
         children.forEach(childId=>{
-          const depth=s.depths.get(childId),progress=depth/s.maxDepth,isTrunk=childId===trunkChild,isTopFork=parentId===s.trunkTip,isLeader=childId===leaderChild,childTarget=s.targets.get(childId)||parentTarget,fallback=organic(childId),lengthNoise=hash01(`length-${childId}`),tiltNoise=hash01(`tilt-${childId}`)-.5,turnNoise=hash01(`turn-${childId}`)-.5,reachNoise=hash01(`reach-${childId}`);let targetX=childTarget.x-parentTarget.x,targetZ=childTarget.z-parentTarget.z;
+          const depth=s.depths.get(childId),progress=depth/s.maxDepth,isTrunk=childId===trunkChild,isTopFork=parentId===s.trunkTip,isLeader=childId===leaderChild,childTarget=s.targets.get(childId)||parentTarget,fallback=organic(childId),lengthNoise=hash01(`length-${childId}`),tiltNoise=hash01(`tilt-${childId}`)-.5,turnNoise=hash01(`turn-${childId}`)-.5,reachNoise=hash01(`reach-${childId}`);if(!s.fibonacciPhaseByNode.has(childId)&&s.fibonacciPhaseByNode.has(parentId))s.fibonacciPhaseByNode.set(childId,s.fibonacciPhaseByNode.get(parentId));let targetX=childTarget.x-parentTarget.x,targetZ=childTarget.z-parentTarget.z;
           if(Math.hypot(targetX,targetZ)<.04){targetX=childTarget.x;targetZ=childTarget.z;}
           if(Math.hypot(targetX,targetZ)<.04){targetX=fallback.x;targetZ=fallback.z;}
           const targetAngle=Math.atan2(targetZ,targetX),parentAngle=parentHorizontal>.035?Math.atan2(parentHeading.z,parentHeading.x):targetAngle,targetTurn=angleDelta(targetAngle,parentAngle);let angle,segmentLength,upRatio;
           if(isTopFork){
-            const canopySide=s.trunkSideByNode.get(childId)||1;
-            angle=DISPLAY_RIGHT_AZIMUTH+(canopySide<0?Math.PI:0)+TOP_DEPTH_TWIST+.045*turnNoise;
-            segmentLength=BASE_LENGTH*(1.13+.08*(lengthNoise-.5));
-            upRatio=clamp(.72+.035*tiltNoise,.7,.74);
+            angle=(s.launchAzimuthByNode.get(childId)??targetAngle)+.08*turnNoise;
+            segmentLength=BASE_LENGTH*((isLeader?1.28:1.2)+.18*(lengthNoise-.5));
+            upRatio=isLeader?clamp(.994+.004*tiltNoise,.992,.996):clamp(.7+.11*tiltNoise,.64,.76);
           }else if(isTrunk){
             angle=parentHorizontal>.035?parentAngle+clamp(targetTurn,-.16,.16)*.18+.04*turnNoise:targetAngle;
             segmentLength=BASE_LENGTH*(.98+.15*progress+.12*(lengthNoise-.5));
             upRatio=clamp(.965+.018*tiltNoise-.018*progress,.94,.975);
           }else if(isLeader){
-            angle=parentAngle+clamp(targetTurn,-.22,.22)*(.18+.1*progress)+.06*turnNoise;
-            segmentLength=BASE_LENGTH*(.92+.34*Math.pow(progress,1.12)+.28*(lengthNoise-.5));
-            upRatio=clamp(parentHeading.y*.9+.075-.055*progress+.04*tiltNoise,.34,.84);
+            angle=parentAngle+.27*Math.sin(depth*GOLDEN_ANGLE+hash01(`phase-${parentId}`)*Math.PI*2)+.11*turnNoise;
+            segmentLength=BASE_LENGTH*(.94+.38*Math.pow(progress,1.12)+.34*(lengthNoise-.5));
+            upRatio=clamp(.69+.11*progress+.09*tiltNoise,.65,.83);
           }else if(trunkChild){
-            const canopySide=s.trunkSideByNode.get(childId)||1;
-            angle=DISPLAY_RIGHT_AZIMUTH+(canopySide<0?Math.PI:0)+DEPTH_FAN*Math.sin(depth*GOLDEN_ANGLE+.35)+.18*turnNoise;
+            angle=(s.launchAzimuthByNode.get(childId)??targetAngle)+.12*turnNoise;
             segmentLength=BASE_LENGTH*(.96+.42*Math.pow(progress,1.12)+.34*(lengthNoise-.5));
-            upRatio=clamp(.53-.12*Math.pow(progress,.9)+.07*tiltNoise,.39,.54);
+            upRatio=clamp(.58+.14*Math.pow(progress,.9)+.08*tiltNoise,.58,.74);
           }else{
-            const side=hash01(`side-${childId}`)<.5?-1:1,divergence=.46+.2*progress+.14*(hash01(`fork-${childId}`)-.5);
-            angle=parentHorizontal>.035?parentAngle+side*divergence:targetAngle+.12*turnNoise;
-            angle+=clamp(angleDelta(targetAngle,angle),-.18,.18)*.16;
+            const side=hash01(`side-${childId}`)<.5?-1:1,divergence=.65+.62*Math.pow(progress,1.1)+.24*(hash01(`fork-${childId}`)-.5),forkTwist=.24*Math.sin(depth*GOLDEN_ANGLE+hash01(`fork-phase-${parentId}`)*Math.PI*2);
+            angle=parentHorizontal>.035?parentAngle+side*divergence+forkTwist:targetAngle+.12*turnNoise;
+            angle+=clamp(angleDelta(targetAngle,angle),-.3,.3)*.23;
             segmentLength=BASE_LENGTH*(.82+.42*Math.pow(progress,1.12)+.36*(lengthNoise-.5));
-            upRatio=clamp(.57-.18*Math.pow(progress,.9)+.08*tiltNoise,.34,.59);
+            upRatio=clamp(.58+.13*Math.pow(progress,.9)+.1*tiltNoise,.56,.75);
           }
-          if(!isTopFork&&progress>.48&&reachNoise>.68)segmentLength*=1.12+.25*(reachNoise-.68)/.32;
+          if(!isTopFork&&progress>.35&&reachNoise>.58)segmentLength*=1.12+.38*(reachNoise-.58)/.42;
           if(isTrunk&&depth<=STRAIGHT_TRUNK_LEVELS){
             s.positions.set(childId,{x:0,y:parent.y+segmentLength,z:0});
             s.headings.set(childId,{x:0,y:1,z:0});
           }else{
-            const horizontalRatio=Math.sqrt(1-upRatio*upRatio),dx=Math.cos(angle)*segmentLength*horizontalRatio*HORIZONTAL_SPREAD,dy=segmentLength*upRatio,dz=Math.sin(angle)*segmentLength*horizontalRatio*HORIZONTAL_SPREAD;
+            let direction;
+            if(isTrunk){
+              direction=normalize3({x:parentHeading.x*.28,y:1,z:parentHeading.z*.28});
+            }else if(isTopFork||trunkChild){
+              direction=s.launchVectorByNode.get(childId)||normalize3({x:Math.cos(angle)*Math.sqrt(1-upRatio*upRatio),y:upRatio,z:Math.sin(angle)*Math.sqrt(1-upRatio*upRatio)});
+            }else{
+              const [basisA,basisB]=orthogonalFrame(parentHeading),branchPhase=s.fibonacciPhaseByNode.get(childId),siblingIndex=children.indexOf(childId),phase=branchPhase==null?hash01(`space-phase-${childId}`)*Math.PI*2:branchPhase+(depth-STRAIGHT_TRUNK_LEVELS)*GOLDEN_ANGLE+siblingIndex*Math.PI,radial={x:basisA.x*Math.cos(phase)+basisB.x*Math.sin(phase),y:basisA.y*Math.cos(phase)+basisB.y*Math.sin(phase),z:basisA.z*Math.cos(phase)+basisB.z*Math.sin(phase)};
+              if(isLeader){
+                const divergence=branchPhase==null?.29:.42+.12*progress,forward=Math.cos(divergence),outward=Math.sin(divergence);direction=normalize3({x:parentHeading.x*forward+radial.x*outward,y:parentHeading.y*forward+radial.y*outward+.025,z:parentHeading.z*forward+radial.z*outward});
+              }else{
+                const divergence=branchPhase==null?.56+.34*progress+.14*(hash01(`space-fork-${childId}`)-.5):.62+.16*progress+.08*(hash01(`space-fork-${childId}`)-.5),outward=Math.sin(divergence),forward=Math.cos(divergence);direction=normalize3({x:parentHeading.x*forward+radial.x*outward,y:parentHeading.y*forward+radial.y*outward+.025,z:parentHeading.z*forward+radial.z*outward});
+              }
+            }
+            if(!isTrunk&&!isTopFork&&!trunkChild)direction=limitRise(direction,isLeader?.7:.64,childId);
+            if(direction.y<.04)direction=normalize3({x:direction.x,y:direction.y+.16,z:direction.z});
+            const scale=isTrunk?1:(depth<=STRAIGHT_TRUNK_LEVELS?LOWER_SHOOT_SCALE:CROWN_SCALE),dx=direction.x*segmentLength*scale,dy=direction.y*segmentLength*scale,dz=direction.z*segmentLength*scale;
             s.positions.set(childId,{x:parent.x+dx,y:parent.y+dy,z:parent.z+dz});
-            s.headings.set(childId,normalize3({x:dx,y:dy,z:dz}));
+            s.headings.set(childId,direction);
           }
           positionQueue.push(childId);
         });
@@ -319,18 +343,25 @@
     function resize(){s.width=el.scene.clientWidth||1;s.height=el.scene.clientHeight||1;el.tree.setAttribute("viewBox",`0 0 ${s.width} ${s.height}`);requestProjection();}
     function requestProjection(){if(s.projectionFrame)return;s.projectionFrame=requestAnimationFrame(()=>{s.projectionFrame=null;projectAll();});}
     function projectAll(){
+      s.fitBase=fittedBase();
       s.guideItems.forEach(g=>g.path.setAttribute("d",g.points.map((p,i)=>{const q=project(p);return`${i?"L":"M"}${round(q.x)} ${round(q.y)}`;}).join(" ")));
       s.edgeItems.forEach(e=>e.line.setAttribute("d",e.points.map((p,i)=>{const q=project(p);return`${i?"L":"M"}${round(q.x)} ${round(q.y)}`;}).join(" ")));
       s.nodeItems.forEach(n=>{const q=project(n.p);n.circle.setAttribute("cx",round(q.x));n.circle.setAttribute("cy",round(q.y));n.circle.setAttribute("r",round(n.r*clamp(q.scale,.68,1.25)));});
-      s.avatars.forEach(a=>{const q=project(a.p),visible=q.x>-80&&q.x<s.width+80&&q.y>-120&&q.y<s.height+120&&q.depth>-CAMERA+2;a.button.classList.toggle("offscreen",!visible);if(!visible)return;const scale=clamp(q.scale*(.9+s.zoom*.1),.56,1.3);a.button.style.left=`${round(q.x)}px`;a.button.style.top=`${round(q.y-42*scale)}px`;a.button.style.setProperty("--scale",scale.toFixed(3));a.button.style.zIndex=String(1000-Math.round(q.depth*10));});
+      s.avatars.forEach(a=>{const q=project(a.p),visible=q.x>-80&&q.x<s.width+80&&q.y>-120&&q.y<s.height+120&&q.depth>-CAMERA+2;a.button.classList.toggle("offscreen",!visible);if(!visible)return;const scale=clamp((.96+(q.scale-1)*.32)*(.9+s.zoom*.1),.88,1.12);a.button.style.left=`${round(q.x)}px`;a.button.style.top=`${round(q.y-42*scale)}px`;a.button.style.setProperty("--scale",scale.toFixed(3));a.button.style.zIndex=String(1000-Math.round(q.depth*10));});
     }
-    function project(p){const cy=Math.cos(s.yaw),sy=Math.sin(s.yaw),x=p.x*cy-p.z*sy,z=p.x*sy+p.z*cy,cp=Math.cos(s.pitch),sp=Math.sin(s.pitch),y=p.y*cp-z*sp,depth=p.y*sp+z*cp,perspective=clamp(CAMERA/(CAMERA+depth),.52,1.7),base=Math.min(s.width/48,Math.max(7.2,(s.height-160)/41))*s.zoom;return{x:s.width/2+x*base*perspective,y:s.height*.92-y*base*perspective,depth,scale:perspective};}
+    function fittedBase(){
+      const natural=Math.min(s.width/48,Math.max(7.2,(s.height-160)/46)),cy=Math.cos(s.yaw),sy=Math.sin(s.yaw),cp=Math.cos(s.pitch),sp=Math.sin(s.pitch),points=s.nodeItems.length?s.nodeItems.map(item=>item.p):Array.from(s.positions.values());let maxX=1,maxUp=1,maxDown=0;
+      points.forEach(p=>{const x=p.x*cy-p.z*sy,z=p.x*sy+p.z*cy,y=p.y*cp-z*sp,depth=p.y*sp+z*cp,perspective=clamp(CAMERA/(CAMERA+depth),.52,1.7),px=Math.abs(x*perspective),py=y*perspective;maxX=Math.max(maxX,px);maxUp=Math.max(maxUp,py);maxDown=Math.max(maxDown,-py);});
+      const widthLimit=Math.max(6,(s.width/2-150)/maxX),topLimit=Math.max(6,(s.height*.92-100)/maxUp),bottomLimit=maxDown>.01?Math.max(6,(s.height*.08-24)/maxDown):Infinity;
+      return Math.min(natural,widthLimit,topLimit,bottomLimit);
+    }
+    function project(p){const cy=Math.cos(s.yaw),sy=Math.sin(s.yaw),x=p.x*cy-p.z*sy,z=p.x*sy+p.z*cy,cp=Math.cos(s.pitch),sp=Math.sin(s.pitch),y=p.y*cp-z*sp,depth=p.y*sp+z*cp,perspective=clamp(CAMERA/(CAMERA+depth),.52,1.7),base=s.fitBase*s.zoom;return{x:s.width/2+x*base*perspective,y:s.height*.92-y*base*perspective,depth,scale:perspective};}
 
     function down(event){if(event.button!==0||event.target.closest("button,a"))return;s.pointer=event.pointerId;s.px=event.clientX;s.py=event.clientY;el.scene.setPointerCapture?.(event.pointerId);el.scene.classList.add("rotating");}
     function move(event){if(s.pointer!==event.pointerId)return;s.yaw+=(event.clientX-s.px)*.007;s.pitch=clamp(s.pitch+(event.clientY-s.py)*.0045,-.62,.42);s.px=event.clientX;s.py=event.clientY;requestProjection();}
     function up(event){if(s.pointer!==event.pointerId)return;el.scene.releasePointerCapture?.(event.pointerId);el.scene.classList.remove("rotating");s.pointer=null;}
     function wheel(event){if(event.target.closest("button,a"))return;event.preventDefault();s.zoom=clamp(s.zoom*Math.exp(-event.deltaY*.0012),.55,2.3);requestProjection();}
-    function reset(){s.yaw=DEFAULT_YAW;s.pitch=-.18;s.zoom=1;requestProjection();}
+    function reset(){s.yaw=DEFAULT_YAW;s.pitch=-.3;s.zoom=1;requestProjection();}
 
     function select(id){s.selected=id;const m=s.movementById.get(id),c=s.clusterByMovement.get(id),depth=s.depths.get(`m${id}`);s.active=c.index;updateNav();highlight();el.panel.innerHTML=`<strong>${String(id).padStart(2,"0")} · <span lang="th">${escape(m.thai)}</span></strong><span>${escape(m.english)} · ${depth} branching steps from the shared root</span>`;}
     function activate(index){s.active=index<0?-1:(index+s.clusters.length)%s.clusters.length;s.selected=null;updateNav();highlight();const c=s.clusters[s.active];el.panel.innerHTML=c?`<strong>Branch group ${c.label}</strong><span>${c.members.length} observed movements branching from the tree-like backbone</span>`:"<strong>Tree-like organic lineage</strong><span>Ten-level vertical trunk · strongly separated organic crown · drag to rotate</span>";}
@@ -356,11 +387,14 @@
     }
     function curvePoints(a,b,id,isTrunk,depth,isLeader,parentHeading,childHeading){
       if(isTrunk&&depth<=STRAIGHT_TRUNK_LEVELS)return[a,b];
-      const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,length=Math.hypot(dx,dy,dz),chord=normalize3({x:dx,y:dy,z:dz}),incoming=normalize3(parentHeading||{x:0,y:1,z:0}),emergence=isLeader?.62:.3,start=normalize3({x:incoming.x*emergence+chord.x*(1-emergence),y:incoming.y*emergence+chord.y*(1-emergence),z:incoming.z*emergence+chord.z*(1-emergence)}),horizontal=Math.hypot(dx,dz),fallback=organic(`curve-axis-${id}`),perpX=horizontal>.001?-dz/horizontal:fallback.x,perpZ=horizontal>.001?dx/horizontal:fallback.z,sign=hash01(`curve-side-${id}`)<.5?-1:1,bend=length*(isTrunk?.03:.045+.045*hash01(`curve-size-${id}`))*sign,lift=length*(.016+.018*hash01(`curve-lift-${id}`)),c1={x:a.x+start.x*length*.34+perpX*bend,y:a.y+start.y*length*.34+lift,z:a.z+start.z*length*.34+perpZ*bend},c2={x:b.x-chord.x*length*.31+perpX*bend*.45,y:b.y-chord.y*length*.31+lift*.65,z:b.z-chord.z*length*.31+perpZ*bend*.45},points=[];
+      const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,length=Math.hypot(dx,dy,dz),chord=normalize3({x:dx,y:dy,z:dz}),incoming=normalize3(parentHeading||{x:0,y:1,z:0}),emergence=isLeader?.62:.3,start=normalize3({x:incoming.x*emergence+chord.x*(1-emergence),y:incoming.y*emergence+chord.y*(1-emergence),z:incoming.z*emergence+chord.z*(1-emergence)}),horizontal=Math.hypot(dx,dz),fallback=organic(`curve-axis-${id}`),perpX=horizontal>.001?-dz/horizontal:fallback.x,perpZ=horizontal>.001?dx/horizontal:fallback.z,sign=hash01(`curve-side-${id}`)<.5?-1:1,bend=length*(isTrunk?.035:.07+.07*hash01(`curve-size-${id}`))*sign,lift=length*(.025+.035*hash01(`curve-lift-${id}`)),c1={x:a.x+start.x*length*.34+perpX*bend,y:a.y+start.y*length*.34+lift,z:a.z+start.z*length*.34+perpZ*bend},c2={x:b.x-chord.x*length*.31+perpX*bend*.45,y:b.y-chord.y*length*.31+lift*.65,z:b.z-chord.z*length*.31+perpZ*bend*.45},points=[];
       for(let i=0;i<=12;i++){const t=i/12,u=1-t;points.push({x:u*u*u*a.x+3*u*u*t*c1.x+3*u*t*t*c2.x+t*t*t*b.x,y:u*u*u*a.y+3*u*u*t*c1.y+3*u*t*t*c2.y+t*t*t*b.y,z:u*u*u*a.z+3*u*u*t*c1.z+3*u*t*t*c2.z+t*t*t*b.z});}
       return points;
     }
     function normalize3(v){const length=Math.hypot(v.x,v.y,v.z)||1;return{x:v.x/length,y:v.y/length,z:v.z/length};}
+    function cross3(a,b){return{x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
+    function orthogonalFrame(direction){const reference=Math.abs(direction.y)<.88?{x:0,y:1,z:0}:{x:1,y:0,z:0},a=normalize3(cross3(reference,direction)),b=normalize3(cross3(direction,a));return[a,b];}
+    function limitRise(direction,maxRise,key){if(direction.y<=maxRise)return direction;const horizontal=Math.hypot(direction.x,direction.z),fallback=organic(`rise-${key}`),x=horizontal>.001?direction.x/horizontal:fallback.x,z=horizontal>.001?direction.z/horizontal:fallback.z,reach=Math.sqrt(1-maxRise*maxRise);return{x:x*reach,y:maxRise,z:z*reach};}
     function hash01(key){let h=2166136261;for(const c of String(key)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return(h>>>0)/4294967296;}
     function organic(key){const angle=hash01(key)*Math.PI*2;return{x:Math.cos(angle),z:Math.sin(angle)};}
     function angleDelta(a,b){return Math.atan2(Math.sin(a-b),Math.cos(a-b));}
