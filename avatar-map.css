@@ -1,0 +1,376 @@
+:root {
+  color-scheme: dark;
+  --ink: #ffffff;
+  --muted: #d3d3d3;
+  --paper: #000000;
+  --paper-bright: #090909;
+  --line: #4a4a4a;
+  --crimson: #ffffff;
+  --crimson-dark: #c8c8c8;
+  --gold: #ffffff;
+  --gold-light: #dedede;
+  --left-arm: #62ded3;
+  --right-arm: #ff8a66;
+  --left-leg: #98adff;
+  --right-leg: #dda0d8;
+  --torso: #ffd36a;
+  --head: #81c8e0;
+  font-family: "Noto Sans Thai", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+button,
+a { font: inherit; -webkit-tap-highlight-color: transparent; }
+
+.avatar-atlas {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 560px;
+  overflow: hidden;
+  background: #000;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+#load-status.has-errors { color: var(--crimson); }
+
+.atlas-actions {
+  position: absolute;
+  z-index: 30;
+  top: 14px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.9);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(12px);
+}
+
+.atlas-actions button,
+.atlas-actions a {
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.atlas-actions > :last-child { border-right: 0; }
+.atlas-actions button:hover,
+.atlas-actions a:hover { background: #fff; color: #000; }
+.atlas-actions button:focus-visible,
+.atlas-actions a:focus-visible { outline: 2px solid var(--gold); outline-offset: -3px; }
+
+.map-surface {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.12) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+}
+
+.map-surface.is-panning { cursor: grabbing; }
+
+.map-surface::before,
+.map-surface::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.map-surface::before {
+  inset: 56px 28px 42px 34px;
+  border-left: 1px solid rgba(255, 255, 255, 0.45);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.map-surface::after { inset: 0; background: transparent; }
+
+.embedding-links,
+.avatar-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
+.embedding-links { z-index: 2; overflow: visible; pointer-events: none; }
+.avatar-layer { z-index: 3; }
+.embedding-links,
+.avatar-layer { transform-origin: 0 0; will-change: transform; }
+
+.embedding-guide {
+  stroke: color-mix(in srgb, var(--guide-color) 60%, #75685c);
+  stroke-width: 0.8;
+  stroke-dasharray: 2 2.5;
+  opacity: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.embedding-anchor {
+  fill: #000;
+  stroke: var(--guide-color);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.avatar-card {
+  --avatar-color: var(--torso);
+  position: absolute;
+  width: var(--card-width, 62px);
+  height: var(--card-height, 90px);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) var(--label-height, 23px);
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  transform-origin: center center;
+  transition: transform 150ms ease;
+  will-change: left, top;
+}
+
+.avatar-card:hover,
+.avatar-card:focus-within {
+  z-index: 50 !important;
+  transform: none;
+}
+
+.avatar-card.has-warning::after {
+  content: "!";
+  position: absolute;
+  right: -5px;
+  top: -5px;
+  z-index: 3;
+  width: 13px;
+  height: 13px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e34949;
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+}
+
+.avatar-card model-viewer {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  --progress-bar-color: var(--avatar-color);
+}
+
+.avatar-label {
+  min-width: 0;
+  padding: 3px 4px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000;
+}
+
+.avatar-label strong {
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.avatar-label span {
+  overflow: hidden;
+  color: #fff;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.labels-hidden .avatar-card { grid-template-rows: 1fr 0; }
+.labels-hidden .avatar-label { display: none; }
+
+.axis {
+  position: absolute;
+  z-index: 5;
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.axis-x { right: 28px; bottom: 25px; }
+.axis-y { left: 15px; top: 64px; writing-mode: vertical-rl; transform: rotate(180deg); }
+
+.map-zoom {
+  position: absolute;
+  z-index: 12;
+  right: 27px;
+  bottom: 51px;
+  display: grid;
+  grid-template-columns: 34px 54px 34px;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.map-zoom button,
+.map-zoom output {
+  min-width: 0;
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+}
+
+.map-zoom output { font-size: 9px; }
+.map-zoom > :last-child { border-right: 0; }
+.map-zoom button { cursor: pointer; }
+.map-zoom button:hover { background: #fff; color: #000; }
+.map-zoom button:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+
+.navigation-hint {
+  position: absolute;
+  z-index: 8;
+  right: 28px;
+  bottom: 14px;
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.map-key,
+.group-legend {
+  position: absolute;
+  z-index: 8;
+  bottom: 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 24px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.88);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8px;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+}
+.map-key { left: 34px; }
+.group-legend { left: 50%; transform: translateX(-50%); }
+.map-key span,
+.group-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.map-key i,
+.group-legend i { display: inline-block; flex: 0 0 auto; }
+.anchor-example { width: 8px; height: 8px; border: 1px solid #fff; border-radius: 50%; background: #000; }
+.line-example { width: 12px; border-top: 1px dashed var(--muted); }
+.warning-key i { width: 13px; height: 13px; display: inline-grid; place-items: center; border-radius: 50%; background: #e34949; color: #fff; font-style: normal; }
+.group-legend i { width: 6px; height: 6px; border-radius: 50%; background: var(--legend-color); }
+
+.loading-overlay {
+  position: absolute;
+  z-index: 80;
+  left: 50%;
+  top: 50%;
+  width: min(360px, calc(100vw - 40px));
+  padding: 20px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.97);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.8);
+  transition: opacity 350ms ease, visibility 350ms ease;
+}
+
+.loading-overlay.is-ready { opacity: 0; visibility: hidden; }
+.loading-copy span { display: block; margin-bottom: 3px; color: #fff; font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; }
+.loading-copy strong { display: block; font-family: Pridi, serif; font-size: 25px; font-weight: 300; }
+.loading-track { height: 3px; margin-top: 15px; overflow: hidden; background: #333; }
+.loading-track span { display: block; width: 0; height: 100%; background: #fff; transition: width 180ms ease; }
+
+.fatal-error {
+  position: absolute;
+  z-index: 100;
+  inset: 20px;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  padding: 30px;
+  border: 1px solid var(--crimson);
+  background: var(--paper-bright);
+  text-align: center;
+}
+.fatal-error[hidden] { display: none; }
+.fatal-error strong { font-family: Pridi, serif; font-size: 26px; font-weight: 300; }
+.fatal-error span { color: var(--muted); font-size: 11px; }
+.fatal-error code { padding: 7px 10px; background: #161616; color: #fff; }
+
+@media (max-width: 680px) {
+  .avatar-atlas { min-height: 500px; }
+  .atlas-actions { left: 8px; right: 8px; top: 8px; width: auto; justify-content: stretch; }
+  .atlas-actions > * { flex: 1; padding: 6px 4px; text-align: center; }
+  .map-surface::before { inset: 50px 12px 38px 21px; }
+  .avatar-card { grid-template-rows: minmax(0, 1fr) var(--label-height, 19px); }
+  .avatar-label { padding: 2px; gap: 2px; }
+  .avatar-label strong,
+  .avatar-label span { font-size: 9px; }
+  .avatar-card:hover,
+  .avatar-card:focus-within { transform: none; }
+  .axis-y { top: 57px; left: 7px; }
+  .axis-x { right: 12px; bottom: 20px; }
+  .map-zoom { right: 10px; bottom: 42px; grid-template-columns: 32px 48px 32px; }
+  .navigation-hint { right: 11px; bottom: 12px; font-size: 7px; }
+  .map-key { display: none; }
+  .group-legend { left: 8px; right: 8px; bottom: 7px; justify-content: center; gap: 6px; transform: none; overflow: hidden; }
+  .group-legend span { font-size: 0; }
+  .group-legend span::after { content: attr(data-short); font-size: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

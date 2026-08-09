@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <title>3D Evolutionary Motion Tree · CyberSubin</title>
+  <script type="module" src="./vendor/model-viewer/model-viewer.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --a: #55e6d9;
+      --b: #ff9b54;
+      --c: #8ca8ff;
+      --d: #e486e1;
+      --e: #a7e06e;
+      --f: #ffd75f;
+      --line: #4a4a4a;
+      --muted: #c9c9c9;
+      font-family: system-ui, -apple-system, "Thonburi", sans-serif;
+      color: #fff;
+      background: #000;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; }
+    button, a { font: inherit; -webkit-tap-highlight-color: transparent; }
+    .app { position: relative; width: 100vw; height: 100dvh; min-height: 540px; overflow: hidden; background: #000; }
+    .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .actions { position: absolute; z-index: 50; top: 14px; right: 18px; display: flex; border: 1px solid var(--line); background: rgba(0,0,0,.9); box-shadow: 0 12px 34px rgba(0,0,0,.62); backdrop-filter: blur(12px); }
+    .actions button, .actions a {
+      min-height: 32px; padding: 7px 9px; border: 0; border-right: 1px solid var(--line);
+      background: transparent; color: #fff; font: 8px ui-monospace, "SFMono-Regular", Menlo, monospace;
+      text-decoration: none; text-transform: uppercase; white-space: nowrap; cursor: pointer;
+    }
+    .actions > :last-child { border-right: 0; }
+    .actions button:hover, .actions a:hover { background: #fff; color: #000; }
+    .actions button:focus-visible, .actions a:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+    .scene {
+      position: absolute; inset: 0; overflow: hidden; touch-action: none; cursor: grab;
+      background: radial-gradient(circle at 50% 58%, rgba(255,255,255,.065), transparent 43%), #000;
+    }
+    .scene.rotating { cursor: grabbing; }
+    .tree, .avatars { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .tree { z-index: 1; overflow: visible; pointer-events: none; }
+    .avatars { z-index: 2; pointer-events: none; }
+    .guide { fill: none; stroke: rgba(255,255,255,.14); stroke-width: 1; stroke-dasharray: 4 6; }
+    .guide.ground { stroke: rgba(255,255,255,.28); stroke-dasharray: none; }
+    .edge { fill: none; stroke: var(--color); stroke-width: var(--width,3px); stroke-linecap: round; stroke-linejoin: round; opacity: .72; transition: opacity .14s, stroke .14s, stroke-width .14s; }
+    .edge.muted { opacity: .1; }
+    .edge.group { stroke: var(--active); stroke-width: calc(var(--width,3px) + 2px); opacity: 1; }
+    .edge.path { stroke: #fff; stroke-width: calc(var(--width,3px) + 4px); opacity: 1; }
+    .node { fill: var(--color); stroke: #000; stroke-width: 1.5; opacity: .9; transition: opacity .14s, fill .14s; }
+    .node.muted { opacity: .14; }
+    .node.group { fill: var(--active); opacity: 1; }
+    .node.path { fill: #fff; opacity: 1; }
+    .avatar {
+      --color: #fff; --scale: 1; position: absolute; width: 70px; height: 104px; padding: 0;
+      transform: translate(-50%,-50%) scale(var(--scale)); transform-origin: center;
+      border: 0; background: transparent; pointer-events: auto; cursor: pointer;
+      transition: opacity .14s, filter .14s;
+    }
+    .avatar model-viewer { width: 100%; height: 100%; background: transparent; --progress-bar-color: var(--color); pointer-events: none; }
+    .avatar::after {
+      content: attr(data-id); position: absolute; left: 50%; bottom: -5px; min-width: 25px;
+      padding: 2px 4px; transform: translateX(-50%); border: 1px solid var(--color);
+      background: rgba(0,0,0,.9); color: #fff; font: 12px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+    }
+    .avatar:hover, .avatar:focus-visible, .avatar.selected { z-index: 5000 !important; filter: drop-shadow(0 0 9px var(--color)); }
+    .avatar:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .avatar.selected::before { content: ""; position: absolute; inset: -4px; border: 2px solid var(--color); border-radius: 50%; }
+    .avatar.muted { opacity: .09; }
+    .avatar.offscreen { display: none; }
+    .hide-labels .avatar::after { display: none; }
+    .branch-nav, .note, .error {
+      position: absolute; z-index: 30; border: 1px solid rgba(255,255,255,.4);
+      background: rgba(0,0,0,.9); color: #fff; backdrop-filter: blur(10px);
+    }
+    .branch-nav { left: 28px; bottom: 43px; min-height: 34px; display: flex; align-items: stretch; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+    .branch-nav > span, .branch-nav output { min-height: 32px; padding: 0 9px; display: flex; align-items: center; color: var(--muted); font-size: 7px; text-transform: uppercase; white-space: nowrap; }
+    .branch-nav > span { border-right: 1px solid var(--line); }
+    .branch-nav output { min-width: 100px; border-left: 1px solid var(--line); }
+    .groups { display: flex; }
+    .branch-nav button { min-width: 32px; min-height: 32px; padding: 0 8px; border: 0; border-right: 1px solid var(--line); background: transparent; color: #fff; font: 8px ui-monospace, "SFMono-Regular", Menlo, monospace; text-transform: uppercase; cursor: pointer; }
+    .branch-nav button:hover { background: rgba(255,255,255,.16); }
+    .branch-nav button[aria-pressed="true"] { background: var(--group-color,#fff); color: #000; }
+    .group-button { position: relative; padding-left: 18px !important; }
+    .group-button::before { content:""; position:absolute; left:7px; top:50%; width:6px; height:12px; transform:translateY(-50%); background:var(--group-color); }
+    .group-button[aria-pressed="true"]::before { background:#000; }
+    .note { left: 28px; bottom: 13px; margin: 0; padding: 4px 7px; border-color: rgba(255,255,255,.22); color: var(--muted); font: 7px ui-monospace, "SFMono-Regular", Menlo, monospace; text-transform: uppercase; }
+    .error { left: 50%; top: 50%; width: min(420px,calc(100vw - 40px)); padding: 20px; transform: translate(-50%,-50%); text-align: center; }
+    .error[hidden] { display: none; }
+    .error strong, .error span { display: block; }
+    .error strong { font: 300 25px Georgia, serif; }
+    .error span { margin-top: 5px; color: var(--muted); font-size: 11px; }
+    @media (max-width: 700px) {
+      .actions { left:8px;right:8px;top:8px;width:auto;justify-content:stretch; }
+      .actions>* { flex:1;padding:6px 2px!important;text-align:center;font-size:6px!important; }
+      .branch-nav { left:8px;right:8px;bottom:42px;overflow:hidden; }
+      .branch-nav>span,.branch-nav output { display:none; }
+      .groups { flex:1; }
+      .branch-nav button { min-width:27px;padding:0 4px; }
+      .group-button { flex:1;padding-left:12px!important; }
+      .group-button::before { left:4px;width:5px; }
+      .note { display:none; }
+      .avatar { width:58px;height:88px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *,*::before,*::after{transition-duration:.01ms!important} }
+  </style>
+</head>
+<body>
+  <main id="app" class="app" aria-busy="true">
+    <nav class="actions" aria-label="3D tree actions">
+      <button id="play" type="button" aria-pressed="true">Pause all</button>
+      <button id="labels" type="button" aria-pressed="true">Hide labels</button>
+      <button id="reset" type="button">Reset view</button>
+      <a href="circular-tree.html">2D tree</a>
+      <a href="avatar-map.html">Embedding</a>
+    </nav>
+    <output id="summary" class="visually-hidden" aria-live="polite">Loading hierarchy…</output>
+    <section id="scene" class="scene" aria-label="Rotatable three-dimensional motion lineage">
+      <svg id="tree" class="tree" role="img" aria-label="Projected three-dimensional phylogenetic tree"><g id="guides"></g><g id="edges"></g><g id="nodes"></g></svg>
+      <div id="avatars" class="avatars"></div>
+      <output id="panel" class="visually-hidden" aria-live="polite">Tree-like organic lineage</output>
+      <nav class="branch-nav" aria-label="Branch navigation"><span>Highlight branch</span><button id="previous" type="button" aria-label="Previous branch">←</button><div id="groups" class="groups"></div><button id="next" type="button" aria-label="Next branch">→</button><button id="all" type="button" aria-pressed="true">All</button><output id="branch-status">All branches</output></nav>
+      <p class="note">The crown opens from a balanced top fork; leader branches flow continuously while lateral growth peels outward.</p>
+    </section>
+    <div id="error" class="error" hidden><strong>The hierarchy could not load.</strong><span id="error-detail"></span></div>
+  </main>
+  <script>
+  (() => {
+    "use strict";
+    const NS = "http://www.w3.org/2000/svg";
+    const BASE_LENGTH = 1.65, HORIZONTAL_SPREAD = 1.82, STRAIGHT_TRUNK_LEVELS = 10, GOLDEN_ANGLE = Math.PI*(3-Math.sqrt(5)), DEPTH_FAN = .62, TOP_DEPTH_TWIST = .48, DEFAULT_YAW = -.56, DISPLAY_RIGHT_AZIMUTH = -DEFAULT_YAW, CANOPY_X = 19, CANOPY_Z = 15.5, CAMERA = 140, SPEED = 3;
+    const COLORS = ["var(--a)","var(--b)","var(--c)","var(--d)","var(--e)","var(--f)"];
+    const el = Object.fromEntries(["app","summary","play","labels","reset","scene","tree","guides","edges","nodes","avatars","panel","previous","groups","next","all","branch-status","error","error-detail"].map(id => [id.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()), document.getElementById(id)]));
+    const s = { movements:[], movementById:new Map(), nodes:new Map(), positions:new Map(), headings:new Map(), children:new Map(), targets:new Map(), depths:new Map(), leaderChildByParent:new Map(), trunkChildByParent:new Map(), trunkSideByNode:new Map(), trunkTip:null, tipPositions:[], maxDepth:0, maxHeight:1, clusters:[], clusterByMovement:new Map(), clusterByNode:new Map(), edgeItems:[], nodeItems:[], guideItems:[], avatars:[], loaded:0, failed:0, playing:true, labels:true, selected:null, active:-1, yaw:DEFAULT_YAW, pitch:-.18, zoom:1, width:1, height:1, pointer:null, px:0, py:0, root:null, projectionFrame:null, trackingFrame:null };
+
+    bind();
+    initialize();
+
+    async function initialize() {
+      try {
+        const response = await fetch("public/data/embedding.json", { cache:"no-store" });
+        if (!response.ok) throw new Error(`embedding.json returned ${response.status}`);
+        const data = await response.json();
+        s.movements = data.movements;
+        s.movementById = new Map(s.movements.map(m => [m.id,m]));
+        s.nodes = new Map(data.lineage_tree.nodes.map(n => [n.id,n]));
+        s.root = data.lineage_tree.root;
+        makeClusters(data.lineage_tree);
+        makePositions(data.lineage_tree);
+        makeGuides();
+        makeTree();
+        makeGroupButtons();
+        resize();
+        el.summary.innerHTML = "<strong>Tree ready</strong> · preparing 59 avatars";
+        el.app.setAttribute("aria-busy","false");
+        const viewer = await waitForViewer();
+        if (viewer) {
+          viewer.dracoDecoderLocation = new URL("./vendor/three/examples/jsm/libs/draco/", document.baseURI).href;
+          makeAvatars(data.lineage_tree.leaf_order);
+          startTracking();
+        } else {
+          el.panel.innerHTML = "<strong>Tree ready; avatars unavailable.</strong><span>The local model viewer did not initialize. The hierarchy remains interactive.</span>";
+          el.summary.innerHTML = "<strong>Tree ready</strong> · avatar viewer unavailable";
+        }
+      } catch (error) {
+        console.error(error);
+        el.errorDetail.textContent = error.message || String(error);
+        el.error.hidden = false;
+        el.summary.innerHTML = "<strong>Load failed</strong>";
+      }
+    }
+
+    function bind() {
+      el.play.addEventListener("click", togglePlay);
+      el.labels.addEventListener("click", toggleLabels);
+      el.reset.addEventListener("click", reset);
+      el.previous.addEventListener("click", () => step(-1));
+      el.next.addEventListener("click", () => step(1));
+      el.all.addEventListener("click", () => activate(-1));
+      el.scene.addEventListener("pointerdown", down);
+      el.scene.addEventListener("pointermove", move);
+      el.scene.addEventListener("pointerup", up);
+      el.scene.addEventListener("pointercancel", up);
+      el.scene.addEventListener("wheel", wheel, { passive:false });
+      window.addEventListener("resize", resize);
+    }
+
+    function waitForViewer() {
+      return Promise.race([
+        customElements.whenDefined("model-viewer").then(() => customElements.get("model-viewer")),
+        new Promise(resolve => setTimeout(() => resolve(null), 10000))
+      ]);
+    }
+
+    function makeClusters(tree) {
+      s.clusters = Array.from({length:6},(_,i)=>({index:i,label:String.fromCharCode(65+i),color:COLORS[i],members:tree.leaf_order.slice(Math.floor(i*tree.leaf_order.length/6),Math.floor((i+1)*tree.leaf_order.length/6)),path:new Set()}));
+      s.clusters.forEach(c => c.members.forEach(id => s.clusterByMovement.set(id,c)));
+      s.nodes.forEach(n => { const set=new Set(n.members.map(id=>s.clusterByMovement.get(id))); if(set.size===1)s.clusterByNode.set(n.id,set.values().next().value); });
+      s.clusters.forEach(c => c.members.forEach(id => { let n=s.nodes.get(`m${id}`); while(n?.parent){c.path.add(n.id);n=s.nodes.get(n.parent);} }));
+    }
+
+    function makePositions(tree) {
+      const maps=s.movements.map(m=>m.map),minX=Math.min(...maps.map(p=>p.x)),maxX=Math.max(...maps.map(p=>p.x)),minZ=Math.min(...maps.map(p=>p.y)),maxZ=Math.max(...maps.map(p=>p.y)),leafTargets=new Map();
+      s.children.clear();s.targets.clear();s.positions.clear();s.headings.clear();s.leaderChildByParent.clear();s.trunkSideByNode.clear();s.depths=new Map([[tree.root,0]]);
+      s.nodes.forEach(n=>{if(n.parent){if(!s.children.has(n.parent))s.children.set(n.parent,[]);s.children.get(n.parent).push(n.id);}});
+      const depthQueue=[tree.root];
+      while(depthQueue.length){const parent=depthQueue.shift(),depth=s.depths.get(parent);(s.children.get(parent)||[]).forEach(id=>{s.depths.set(id,depth+1);depthQueue.push(id);});}
+      s.maxDepth=Math.max(...s.depths.values());
+      s.children.forEach((children,parent)=>s.leaderChildByParent.set(parent,children.reduce((best,id)=>s.nodes.get(id).members.length>s.nodes.get(best).members.length?id:best)));
+      s.trunkChildByParent.clear();let trunkCursor=tree.root;
+      for(let level=0;level<STRAIGHT_TRUNK_LEVELS&&s.leaderChildByParent.has(trunkCursor);level++){const mainChild=s.leaderChildByParent.get(trunkCursor);s.trunkChildByParent.set(trunkCursor,mainChild);trunkCursor=mainChild;}
+      s.trunkTip=trunkCursor;
+      let leftWeight=0,rightWeight=0;const topChildren=(s.children.get(s.trunkTip)||[]).slice().sort((a,b)=>s.nodes.get(b).members.length-s.nodes.get(a).members.length||String(a).localeCompare(String(b)));
+      topChildren.forEach((id,index)=>{const side=index%2===0?-1:1;s.trunkSideByNode.set(id,side);side<0?leftWeight+=s.nodes.get(id).members.length:rightWeight+=s.nodes.get(id).members.length;});
+      const trunkLaterals=[];s.trunkChildByParent.forEach((mainChild,parentId)=>(s.children.get(parentId)||[]).filter(id=>id!==mainChild).forEach(id=>trunkLaterals.push({id,weight:s.nodes.get(id).members.length})));
+      trunkLaterals.sort((a,b)=>b.weight-a.weight||String(a.id).localeCompare(String(b.id))).forEach(branch=>{const side=leftWeight<=rightWeight?-1:1;s.trunkSideByNode.set(branch.id,side);side<0?leftWeight+=branch.weight:rightWeight+=branch.weight;});
+      s.movements.forEach(m=>{
+        const u=(m.map.x-minX)/(maxX-minX)-.5,v=(m.map.y-minZ)/(maxZ-minZ)-.5,rotation=-.13,rx=u*Math.cos(rotation)-v*Math.sin(rotation),rz=u*Math.sin(rotation)+v*Math.cos(rotation);
+        leafTargets.set(m.id,{x:rx*CANOPY_X*2,z:rz*CANOPY_Z*2});
+      });
+      const mean=Array.from(leafTargets.values()).reduce((o,p)=>({x:o.x+p.x/leafTargets.size,z:o.z+p.z/leafTargets.size}),{x:0,z:0});
+      leafTargets.forEach((p,id)=>{p.x-=mean.x;p.z-=mean.z;s.targets.set(`m${id}`,p);});
+      s.nodes.forEach(n=>{
+        if(n.type==="movement")return;
+        const p=n.members.reduce((o,id)=>{const q=leafTargets.get(id);o.x+=q.x;o.z+=q.z;return o;},{x:0,z:0});p.x/=n.members.length;p.z/=n.members.length;s.targets.set(n.id,p);
+      });
+      s.positions.set(tree.root,{x:0,y:0,z:0});s.headings.set(tree.root,{x:0,y:1,z:0});
+      const positionQueue=[tree.root];
+      while(positionQueue.length){
+        const parentId=positionQueue.shift(),parent=s.positions.get(parentId),parentHeading=s.headings.get(parentId)||{x:0,y:1,z:0},parentTarget=s.targets.get(parentId)||{x:0,z:0},children=s.children.get(parentId)||[];
+        if(!children.length)continue;
+        const trunkChild=s.trunkChildByParent.get(parentId),leaderChild=s.leaderChildByParent.get(parentId),parentHorizontal=Math.hypot(parentHeading.x,parentHeading.z);
+        children.forEach(childId=>{
+          const depth=s.depths.get(childId),progress=depth/s.maxDepth,isTrunk=childId===trunkChild,isTopFork=parentId===s.trunkTip,isLeader=childId===leaderChild,childTarget=s.targets.get(childId)||parentTarget,fallback=organic(childId),lengthNoise=hash01(`length-${childId}`),tiltNoise=hash01(`tilt-${childId}`)-.5,turnNoise=hash01(`turn-${childId}`)-.5,reachNoise=hash01(`reach-${childId}`);let targetX=childTarget.x-parentTarget.x,targetZ=childTarget.z-parentTarget.z;
+          if(Math.hypot(targetX,targetZ)<.04){targetX=childTarget.x;targetZ=childTarget.z;}
+          if(Math.hypot(targetX,targetZ)<.04){targetX=fallback.x;targetZ=fallback.z;}
+          const targetAngle=Math.atan2(targetZ,targetX),parentAngle=parentHorizontal>.035?Math.atan2(parentHeading.z,parentHeading.x):targetAngle,targetTurn=angleDelta(targetAngle,parentAngle);let angle,segmentLength,upRatio;
+          if(isTopFork){
+            const canopySide=s.trunkSideByNode.get(childId)||1;
+            angle=DISPLAY_RIGHT_AZIMUTH+(canopySide<0?Math.PI:0)+TOP_DEPTH_TWIST+.045*turnNoise;
+            segmentLength=BASE_LENGTH*(1.13+.08*(lengthNoise-.5));
+            upRatio=clamp(.72+.035*tiltNoise,.7,.74);
+          }else if(isTrunk){
+            angle=parentHorizontal>.035?parentAngle+clamp(targetTurn,-.16,.16)*.18+.04*turnNoise:targetAngle;
+            segmentLength=BASE_LENGTH*(.98+.15*progress+.12*(lengthNoise-.5));
+            upRatio=clamp(.965+.018*tiltNoise-.018*progress,.94,.975);
+          }else if(isLeader){
+            angle=parentAngle+clamp(targetTurn,-.22,.22)*(.18+.1*progress)+.06*turnNoise;
+            segmentLength=BASE_LENGTH*(.92+.34*Math.pow(progress,1.12)+.28*(lengthNoise-.5));
+            upRatio=clamp(parentHeading.y*.9+.075-.055*progress+.04*tiltNoise,.34,.84);
+          }else if(trunkChild){
+            const canopySide=s.trunkSideByNode.get(childId)||1;
+            angle=DISPLAY_RIGHT_AZIMUTH+(canopySide<0?Math.PI:0)+DEPTH_FAN*Math.sin(depth*GOLDEN_ANGLE+.35)+.18*turnNoise;
+            segmentLength=BASE_LENGTH*(.96+.42*Math.pow(progress,1.12)+.34*(lengthNoise-.5));
+            upRatio=clamp(.53-.12*Math.pow(progress,.9)+.07*tiltNoise,.39,.54);
+          }else{
+            const side=hash01(`side-${childId}`)<.5?-1:1,divergence=.46+.2*progress+.14*(hash01(`fork-${childId}`)-.5);
+            angle=parentHorizontal>.035?parentAngle+side*divergence:targetAngle+.12*turnNoise;
+            angle+=clamp(angleDelta(targetAngle,angle),-.18,.18)*.16;
+            segmentLength=BASE_LENGTH*(.82+.42*Math.pow(progress,1.12)+.36*(lengthNoise-.5));
+            upRatio=clamp(.57-.18*Math.pow(progress,.9)+.08*tiltNoise,.34,.59);
+          }
+          if(!isTopFork&&progress>.48&&reachNoise>.68)segmentLength*=1.12+.25*(reachNoise-.68)/.32;
+          if(isTrunk&&depth<=STRAIGHT_TRUNK_LEVELS){
+            s.positions.set(childId,{x:0,y:parent.y+segmentLength,z:0});
+            s.headings.set(childId,{x:0,y:1,z:0});
+          }else{
+            const horizontalRatio=Math.sqrt(1-upRatio*upRatio),dx=Math.cos(angle)*segmentLength*horizontalRatio*HORIZONTAL_SPREAD,dy=segmentLength*upRatio,dz=Math.sin(angle)*segmentLength*horizontalRatio*HORIZONTAL_SPREAD;
+            s.positions.set(childId,{x:parent.x+dx,y:parent.y+dy,z:parent.z+dz});
+            s.headings.set(childId,normalize3({x:dx,y:dy,z:dz}));
+          }
+          positionQueue.push(childId);
+        });
+      }
+      s.tipPositions=tree.leaf_order.map(id=>s.positions.get(`m${id}`));s.maxHeight=Math.max(...s.tipPositions.map(p=>p.y));
+    }
+
+    function makeGuides() {
+      const crown=smoothHull(convexHull(s.tipPositions),2);
+      [0,.25,.5,.75,1].forEach((progress,i)=>{
+        const spread=progress===0?.06:Math.pow(progress,.9),height=progress*s.maxHeight,points=crown.map(p=>({x:p.x*spread,y:height,z:p.z*spread}));points.push({...points[0]});
+        const path=document.createElementNS(NS,"path");path.setAttribute("class",`guide${i===0?" ground":""}`);el.guides.appendChild(path);s.guideItems.push({path,points});
+      });
+    }
+
+    function makeTree() {
+      s.nodes.forEach(n=>{
+        if(n.parent){const c=s.clusterByNode.get(n.id),line=document.createElementNS(NS,"path"),width=2+4.2*Math.sqrt(n.members.length/s.movements.length),isTrunk=s.trunkChildByParent.get(n.parent)===n.id,isTopFork=n.parent===s.trunkTip,isLeader=isTopFork||s.leaderChildByParent.get(n.parent)===n.id,depth=s.depths.get(n.id),isStraightStem=isTrunk&&depth<=STRAIGHT_TRUNK_LEVELS,a=s.positions.get(n.parent),b=s.positions.get(n.id);line.setAttribute("class","edge");line.dataset.trunk=String(isTrunk);line.dataset.depth=String(depth);line.style.setProperty("--color",isStraightStem?"#8c8c8c":(c?.color||"#8c8c8c"));line.style.setProperty("--width",`${width.toFixed(2)}px`);el.edges.appendChild(line);s.edgeItems.push({id:n.id,line,points:curvePoints(a,b,n.id,isTrunk,depth,isLeader,s.headings.get(n.parent),s.headings.get(n.id))});}
+        const c=s.clusterByNode.get(n.id),circle=document.createElementNS(NS,"circle");circle.setAttribute("class","node");circle.style.setProperty("--color",n.id===s.root?"#fff":(c?.color||"#8c8c8c"));el.nodes.appendChild(circle);s.nodeItems.push({id:n.id,circle,p:s.positions.get(n.id),r:n.id===s.root?5:(n.type==="movement"?3:3.6),root:n.id===s.root});
+      });
+    }
+
+    function makeGroupButtons() {
+      s.clusters.forEach(c=>{const b=document.createElement("button");b.type="button";b.className="group-button";b.dataset.index=c.index;b.style.setProperty("--group-color",c.color);b.setAttribute("aria-pressed","false");b.textContent=`${c.label} · ${c.members.length}`;b.addEventListener("click",()=>activate(s.active===c.index?-1:c.index));el.groups.appendChild(b);});
+    }
+
+    function makeAvatars(order) {
+      const fragment=document.createDocumentFragment();
+      order.forEach(id=>{
+        const m=s.movementById.get(id),c=s.clusterByMovement.get(id),button=document.createElement("button"),viewer=document.createElement("model-viewer");
+        button.type="button";button.className="avatar";button.dataset.id=String(id).padStart(2,"0");button.style.setProperty("--color",c.color);button.title=`${id}. ${m.thai} — ${m.english}`;button.setAttribute("aria-label",button.title);button.addEventListener("click",event=>{event.stopPropagation();select(id);});
+        configure(viewer,m);const item={m,c,button,viewer,p:s.positions.get(`m${id}`),centerIndex:-1,settled:false};
+        viewer.addEventListener("load",()=>{if(!item.settled){item.settled=true;record(false);}viewer.timeScale=SPEED;viewer.currentTime=m.skeleton?.calibration_time_seconds||0;calibrate(item);viewer.jumpCameraToGoal?.();s.playing?viewer.play?.():viewer.pause?.();});
+        viewer.addEventListener("error",()=>{if(!item.settled){item.settled=true;record(true);}});
+        viewer.setAttribute("src",m.glb);button.appendChild(viewer);fragment.appendChild(button);s.avatars.push(item);
+      });
+      el.avatars.appendChild(fragment);requestProjection();setTimeout(()=>{if(!s.loaded&&!s.failed)el.panel.innerHTML="<strong>Tree loaded; avatars are still starting.</strong><span>The branch structure is ready and rotatable.</span>";},12000);
+    }
+
+    function configure(v,m) {
+      v.setAttribute("animation-name",m.animation_name);v.setAttribute("autoplay","");v.setAttribute("loading","eager");v.setAttribute("reveal","auto");v.setAttribute("interaction-prompt","none");v.setAttribute("shadow-intensity","0");v.setAttribute("tone-mapping","neutral");
+      const size=m.skeleton?.calibration_head_to_hips_distance||m.skeleton?.head_to_hips_distance||66.2,distance=size*6.25;
+      v.setAttribute("camera-orbit",`0deg 82deg ${distance.toFixed(3)}m`);v.setAttribute("min-camera-orbit",`auto auto ${distance.toFixed(3)}m`);v.setAttribute("max-camera-orbit",`auto auto ${distance.toFixed(3)}m`);v.setAttribute("field-of-view","35deg");v.setAttribute("min-field-of-view","35deg");v.setAttribute("max-field-of-view","35deg");v.setAttribute("interpolation-decay","0");
+      const center=m.skeleton?.calibration_center;if(center?.length===3)v.setAttribute("camera-target",`${center[0]}m ${center[1]}m ${center[2]}m`);v.setAttribute("alt",`${m.english}, animated Thai dance avatar`);
+    }
+
+    function resize(){s.width=el.scene.clientWidth||1;s.height=el.scene.clientHeight||1;el.tree.setAttribute("viewBox",`0 0 ${s.width} ${s.height}`);requestProjection();}
+    function requestProjection(){if(s.projectionFrame)return;s.projectionFrame=requestAnimationFrame(()=>{s.projectionFrame=null;projectAll();});}
+    function projectAll(){
+      s.guideItems.forEach(g=>g.path.setAttribute("d",g.points.map((p,i)=>{const q=project(p);return`${i?"L":"M"}${round(q.x)} ${round(q.y)}`;}).join(" ")));
+      s.edgeItems.forEach(e=>e.line.setAttribute("d",e.points.map((p,i)=>{const q=project(p);return`${i?"L":"M"}${round(q.x)} ${round(q.y)}`;}).join(" ")));
+      s.nodeItems.forEach(n=>{const q=project(n.p);n.circle.setAttribute("cx",round(q.x));n.circle.setAttribute("cy",round(q.y));n.circle.setAttribute("r",round(n.r*clamp(q.scale,.68,1.25)));});
+      s.avatars.forEach(a=>{const q=project(a.p),visible=q.x>-80&&q.x<s.width+80&&q.y>-120&&q.y<s.height+120&&q.depth>-CAMERA+2;a.button.classList.toggle("offscreen",!visible);if(!visible)return;const scale=clamp(q.scale*(.9+s.zoom*.1),.56,1.3);a.button.style.left=`${round(q.x)}px`;a.button.style.top=`${round(q.y-42*scale)}px`;a.button.style.setProperty("--scale",scale.toFixed(3));a.button.style.zIndex=String(1000-Math.round(q.depth*10));});
+    }
+    function project(p){const cy=Math.cos(s.yaw),sy=Math.sin(s.yaw),x=p.x*cy-p.z*sy,z=p.x*sy+p.z*cy,cp=Math.cos(s.pitch),sp=Math.sin(s.pitch),y=p.y*cp-z*sp,depth=p.y*sp+z*cp,perspective=clamp(CAMERA/(CAMERA+depth),.52,1.7),base=Math.min(s.width/48,Math.max(7.2,(s.height-160)/41))*s.zoom;return{x:s.width/2+x*base*perspective,y:s.height*.92-y*base*perspective,depth,scale:perspective};}
+
+    function down(event){if(event.button!==0||event.target.closest("button,a"))return;s.pointer=event.pointerId;s.px=event.clientX;s.py=event.clientY;el.scene.setPointerCapture?.(event.pointerId);el.scene.classList.add("rotating");}
+    function move(event){if(s.pointer!==event.pointerId)return;s.yaw+=(event.clientX-s.px)*.007;s.pitch=clamp(s.pitch+(event.clientY-s.py)*.0045,-.62,.42);s.px=event.clientX;s.py=event.clientY;requestProjection();}
+    function up(event){if(s.pointer!==event.pointerId)return;el.scene.releasePointerCapture?.(event.pointerId);el.scene.classList.remove("rotating");s.pointer=null;}
+    function wheel(event){if(event.target.closest("button,a"))return;event.preventDefault();s.zoom=clamp(s.zoom*Math.exp(-event.deltaY*.0012),.55,2.3);requestProjection();}
+    function reset(){s.yaw=DEFAULT_YAW;s.pitch=-.18;s.zoom=1;requestProjection();}
+
+    function select(id){s.selected=id;const m=s.movementById.get(id),c=s.clusterByMovement.get(id),depth=s.depths.get(`m${id}`);s.active=c.index;updateNav();highlight();el.panel.innerHTML=`<strong>${String(id).padStart(2,"0")} · <span lang="th">${escape(m.thai)}</span></strong><span>${escape(m.english)} · ${depth} branching steps from the shared root</span>`;}
+    function activate(index){s.active=index<0?-1:(index+s.clusters.length)%s.clusters.length;s.selected=null;updateNav();highlight();const c=s.clusters[s.active];el.panel.innerHTML=c?`<strong>Branch group ${c.label}</strong><span>${c.members.length} observed movements branching from the tree-like backbone</span>`:"<strong>Tree-like organic lineage</strong><span>Ten-level vertical trunk · strongly separated organic crown · drag to rotate</span>";}
+    function step(direction){activate(s.active<0?(direction>0?0:s.clusters.length-1):(s.active+direction+s.clusters.length)%s.clusters.length);}
+    function updateNav(){const c=s.clusters[s.active]||null;el.groups.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.index)===s.active)));el.all.setAttribute("aria-pressed",String(!c));el.all.style.setProperty("--group-color","#fff");el.branchStatus.textContent=c?`Group ${c.label} · ${c.members.length} dances`:"All branches";}
+    function pathFor(id){const set=new Set();let n=id==null?null:s.nodes.get(`m${id}`);while(n?.parent){set.add(n.id);n=s.nodes.get(n.parent);}return set;}
+    function highlight(){const c=s.clusters[s.active]||null,path=pathFor(s.selected);s.edgeItems.forEach(e=>{const p=path.has(e.id),g=!!c?.path.has(e.id);e.line.style.setProperty("--active",c?.color||"#fff");e.line.classList.toggle("path",p);e.line.classList.toggle("group",g);e.line.classList.toggle("muted",!!c&&!g&&!p);});s.nodeItems.forEach(n=>{const p=path.has(n.id)||(s.selected!=null&&n.root),g=!!c&&(c.path.has(n.id)||n.root);n.circle.style.setProperty("--active",c?.color||"#fff");n.circle.classList.toggle("path",p);n.circle.classList.toggle("group",g);n.circle.classList.toggle("muted",!!c&&!g&&!p);});s.avatars.forEach(a=>{a.button.classList.toggle("selected",a.m.id===s.selected);a.button.classList.toggle("muted",!!c&&a.c!==c);});}
+
+    function startTracking(){const tick=()=>{if(s.playing)s.avatars.forEach(center);s.trackingFrame=requestAnimationFrame(tick);};s.trackingFrame=requestAnimationFrame(tick);}
+    function center(item,force=false){const centers=item.m.skeleton?.center_track,duration=item.viewer.duration;if(!centers?.length||!Number.isFinite(duration)||duration<=0)return;const progress=((item.viewer.currentTime%duration)+duration)%duration/duration,index=Math.min(centers.length-1,Math.round(progress*(centers.length-1)));if(!force&&index===item.centerIndex)return;item.centerIndex=index;const [x,y,z]=centers[index];item.viewer.setAttribute("camera-target",`${x}m ${y}m ${z}m`);item.viewer.jumpCameraToGoal?.();}
+    function calibrate(item){const c=item.m.skeleton?.calibration_center,centers=item.m.skeleton?.center_track,duration=item.viewer.duration;if(!c?.length||!centers?.length||!Number.isFinite(duration)||duration<=0){center(item,true);return;}const progress=clamp(item.viewer.currentTime/duration,0,1);item.centerIndex=Math.min(centers.length-1,Math.round(progress*(centers.length-1)));item.viewer.setAttribute("camera-target",`${c[0]}m ${c[1]}m ${c[2]}m`);}
+    function togglePlay(){s.playing=!s.playing;s.avatars.forEach(a=>{a.viewer.timeScale=SPEED;s.playing?a.viewer.play?.():a.viewer.pause?.();});el.play.textContent=s.playing?"Pause all":"Play all";el.play.setAttribute("aria-pressed",String(s.playing));}
+    function toggleLabels(){s.labels=!s.labels;el.app.classList.toggle("hide-labels",!s.labels);el.labels.textContent=s.labels?"Hide labels":"Show labels";el.labels.setAttribute("aria-pressed",String(s.labels));}
+    function record(failed){failed?s.failed++:s.loaded++;el.summary.innerHTML=`<strong>${s.loaded} / 59 avatars</strong>${s.failed?` · ${s.failed} failed`:" · 3× playback"}`;}
+    function convexHull(points){
+      const sorted=points.map(p=>({x:p.x,z:p.z})).sort((a,b)=>a.x-b.x||a.z-b.z),cross=(o,a,b)=>(a.x-o.x)*(b.z-o.z)-(a.z-o.z)*(b.x-o.x),lower=[],upper=[];
+      sorted.forEach(p=>{while(lower.length>=2&&cross(lower.at(-2),lower.at(-1),p)<=0)lower.pop();lower.push(p);});
+      sorted.slice().reverse().forEach(p=>{while(upper.length>=2&&cross(upper.at(-2),upper.at(-1),p)<=0)upper.pop();upper.push(p);});
+      lower.pop();upper.pop();return lower.concat(upper);
+    }
+    function smoothHull(points,iterations){
+      let result=points.slice();for(let k=0;k<iterations;k++){const next=[];result.forEach((p,i)=>{const q=result[(i+1)%result.length];next.push({x:p.x*.75+q.x*.25,z:p.z*.75+q.z*.25},{x:p.x*.25+q.x*.75,z:p.z*.25+q.z*.75});});result=next;}return result;
+    }
+    function curvePoints(a,b,id,isTrunk,depth,isLeader,parentHeading,childHeading){
+      if(isTrunk&&depth<=STRAIGHT_TRUNK_LEVELS)return[a,b];
+      const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,length=Math.hypot(dx,dy,dz),chord=normalize3({x:dx,y:dy,z:dz}),incoming=normalize3(parentHeading||{x:0,y:1,z:0}),emergence=isLeader?.62:.3,start=normalize3({x:incoming.x*emergence+chord.x*(1-emergence),y:incoming.y*emergence+chord.y*(1-emergence),z:incoming.z*emergence+chord.z*(1-emergence)}),horizontal=Math.hypot(dx,dz),fallback=organic(`curve-axis-${id}`),perpX=horizontal>.001?-dz/horizontal:fallback.x,perpZ=horizontal>.001?dx/horizontal:fallback.z,sign=hash01(`curve-side-${id}`)<.5?-1:1,bend=length*(isTrunk?.03:.045+.045*hash01(`curve-size-${id}`))*sign,lift=length*(.016+.018*hash01(`curve-lift-${id}`)),c1={x:a.x+start.x*length*.34+perpX*bend,y:a.y+start.y*length*.34+lift,z:a.z+start.z*length*.34+perpZ*bend},c2={x:b.x-chord.x*length*.31+perpX*bend*.45,y:b.y-chord.y*length*.31+lift*.65,z:b.z-chord.z*length*.31+perpZ*bend*.45},points=[];
+      for(let i=0;i<=12;i++){const t=i/12,u=1-t;points.push({x:u*u*u*a.x+3*u*u*t*c1.x+3*u*t*t*c2.x+t*t*t*b.x,y:u*u*u*a.y+3*u*u*t*c1.y+3*u*t*t*c2.y+t*t*t*b.y,z:u*u*u*a.z+3*u*u*t*c1.z+3*u*t*t*c2.z+t*t*t*b.z});}
+      return points;
+    }
+    function normalize3(v){const length=Math.hypot(v.x,v.y,v.z)||1;return{x:v.x/length,y:v.y/length,z:v.z/length};}
+    function hash01(key){let h=2166136261;for(const c of String(key)){h^=c.charCodeAt(0);h=Math.imul(h,16777619);}return(h>>>0)/4294967296;}
+    function organic(key){const angle=hash01(key)*Math.PI*2;return{x:Math.cos(angle),z:Math.sin(angle)};}
+    function angleDelta(a,b){return Math.atan2(Math.sin(a-b),Math.cos(a-b));}
+    function clamp(v,a,b){return Math.min(b,Math.max(a,v));}
+    function round(v){return Number(v.toFixed(2));}
+    function escape(v){return String(v).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[c]);}
+  })();
+  </script>
+</body>
+</html>

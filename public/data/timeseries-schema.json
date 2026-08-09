@@ -1,0 +1,14 @@
+{
+  "format": "NumPy compressed archive (.npz)",
+  "sample_rate_hz": 12.0,
+  "arrays": {
+    "time_seconds": "[time] seconds from animation start",
+    "joint_names": "[joint] GLB skeleton node names",
+    "joint_groups": "[joint] analytical body-part groups",
+    "local_translation": "[time, joint, xyz] GLB local translation",
+    "local_rotation_xyzw": "[time, joint, xyzw] normalized local quaternion",
+    "world_position": "[time, joint, xyz] forward-kinematic world position",
+    "linear_velocity": "[time, joint, xyz] world-position derivative per second",
+    "angular_speed": "[time, joint] local angular speed in radians per second"
+  }
+}

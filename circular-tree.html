@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A circular motion-similarity lineage of 59 animated Thai dance recordings."
+    />
+    <title>Circular Motion Lineage · CyberSubin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600&family=Pridi:wght@300;400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="circular-tree.css" />
+    <script
+      type="module"
+      src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.3.1/model-viewer.min.js"
+    ></script>
+    <script defer src="circular-tree.js"></script>
+  </head>
+  <body>
+    <main id="circular-atlas" class="circular-atlas" aria-busy="true">
+      <nav class="tree-actions" aria-label="Circular tree actions">
+        <button id="play-all" type="button" aria-pressed="true">Pause all</button>
+        <button id="toggle-labels" type="button" aria-pressed="true">Hide names</button>
+        <button id="refit" type="button">Fit</button>
+        <a href="avatar-map.html">Embedding map</a>
+        <a href="evolution-tree-3d.html">3D tree</a>
+      </nav>
+      <span id="load-status" class="visually-hidden" aria-live="polite"><strong id="loaded-count">0</strong> / 59 loaded</span>
+
+      <section id="tree-viewport" class="tree-viewport" aria-label="Zoomable circular lineage tree">
+        <div id="tree-stage" class="tree-stage">
+          <svg id="tree-svg" class="tree-svg" viewBox="0 0 1800 1800" role="img" aria-labelledby="tree-svg-title tree-svg-desc">
+            <title id="tree-svg-title">Circular motion-similarity lineage</title>
+            <desc id="tree-svg-desc">Fifty-nine Thai dance recordings arranged as animated leaves around an average-linkage tree derived from dynamic time-warping distances.</desc>
+            <g id="tree-guides" class="tree-guides"></g>
+            <g id="tree-branches" class="tree-branches"></g>
+            <g id="tree-nodes" class="tree-nodes"></g>
+            <g id="tree-labels" class="tree-labels"></g>
+            <g class="tree-center" aria-hidden="true">
+              <circle cx="900" cy="900" r="10"></circle>
+            </g>
+          </svg>
+          <div id="leaf-avatars" class="leaf-avatars"></div>
+        </div>
+
+        <div class="tree-zoom" role="group" aria-label="Tree zoom controls">
+          <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+          <output id="zoom-level" aria-live="polite">100%</output>
+          <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+        </div>
+        <div class="navigation-hint">Scroll to zoom · Drag to pan · Select a dancer to trace its branch</div>
+        <div id="selected-leaf" class="selected-leaf" aria-live="polite">
+          <strong>Motion lineage</strong>
+          <span>Choose a branch group below, or select an avatar to trace its path.</span>
+        </div>
+        <nav class="branch-navigator" aria-label="Branch highlight navigation">
+          <span class="branch-navigator-label">Highlight branch</span>
+          <button id="branch-previous" type="button" aria-label="Highlight previous branch">←</button>
+          <div id="group-legend" class="branch-groups" role="group" aria-label="Choose a branch group"></div>
+          <button id="branch-next" type="button" aria-label="Highlight next branch">→</button>
+          <button id="branch-all" type="button" aria-pressed="true">All</button>
+          <output id="branch-status" class="branch-status" aria-live="polite">All branches</output>
+        </nav>
+        <p class="interpretation-note">Similarity dendrogram · branch radius encodes DTW merge distance · not verified historical descent</p>
+      </section>
+
+      <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-copy">
+          <span>Constructing the circular lineage</span>
+          <strong>Loading 59 animated leaves</strong>
+        </div>
+        <div class="loading-track"><span id="loading-bar"></span></div>
+      </div>
+
+      <div id="fatal-error" class="fatal-error" hidden>
+        <strong>The circular lineage could not load.</strong>
+        <span>Serve this project over HTTP and reload the page.</span>
+        <code>python3 -m http.server 8000</code>
+      </div>
+    </main>
+  </body>
+</html>

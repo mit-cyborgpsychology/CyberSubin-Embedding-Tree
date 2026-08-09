@@ -1,0 +1,352 @@
+:root {
+  color-scheme: dark;
+  --ink: #fff;
+  --muted: #cfcfcf;
+  --paper: #000;
+  --line: #484848;
+  --cluster-a: #55e6d9;
+  --cluster-b: #ff9b54;
+  --cluster-c: #8ca8ff;
+  --cluster-d: #e486e1;
+  --cluster-e: #a7e06e;
+  --cluster-f: #ffd75f;
+  --trunk: #a7a7a7;
+  font-family: "Noto Sans Thai", system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+button,
+a { font: inherit; -webkit-tap-highlight-color: transparent; }
+
+.circular-atlas {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  min-height: 560px;
+  overflow: hidden;
+  background: #000;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+#load-status.has-errors { color: #ff6d6d; }
+
+.tree-actions { position: absolute; z-index: 40; top: 14px; right: 18px; display: flex; align-items: center; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.9); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.62); backdrop-filter: blur(12px); }
+.tree-actions button,
+.tree-actions a {
+  min-height: 32px;
+  padding: 7px 9px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8px;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tree-actions > :last-child { border-right: 0; }
+.tree-actions button:hover,
+.tree-actions a:hover { background: #fff; color: #000; }
+.tree-actions button:focus-visible,
+.tree-actions a:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+
+.tree-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+  background-image:
+    radial-gradient(circle at 50% 53%, rgba(255, 255, 255, 0.055), transparent 45%),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: auto, 40px 40px, 40px 40px;
+}
+.tree-viewport.is-panning { cursor: grabbing; }
+
+.tree-stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1800px;
+  height: 1800px;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.tree-svg,
+.leaf-avatars { position: absolute; inset: 0; width: 1800px; height: 1800px; }
+.tree-svg { z-index: 1; overflow: visible; }
+.leaf-avatars { z-index: 2; pointer-events: none; }
+
+.tree-guides circle { fill: none; stroke: rgba(255, 255, 255, 0.1); stroke-width: 1.5; }
+.tree-guides text { fill: rgba(255, 255, 255, 0.45); font-family: "IBM Plex Mono", monospace; font-size: 16px; letter-spacing: 0.08em; }
+.tree-branch {
+  fill: none;
+  stroke: var(--branch-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.72;
+  transition: opacity 140ms ease, stroke 140ms ease, stroke-width 140ms ease;
+}
+.tree-branch.is-context { opacity: 0.3; }
+.tree-branch.is-muted { opacity: 0.14; }
+.tree-branch.is-group-active { stroke: var(--highlight-color); opacity: 1; stroke-width: 4.5; }
+.tree-branch.is-path { stroke: var(--highlight-color); opacity: 1; stroke-width: 6.5; }
+.tree-node {
+  fill: var(--branch-color);
+  stroke: #000;
+  stroke-width: 1.5;
+  opacity: 0.94;
+  transition: opacity 140ms ease, fill 140ms ease, r 140ms ease;
+}
+.tree-node.is-context { opacity: 0.38; }
+.tree-node.is-muted { opacity: 0.18; }
+.tree-node.is-group-active { fill: var(--highlight-color); opacity: 1; r: 4.7px; }
+.tree-node.is-path { fill: var(--highlight-color); stroke: #fff; opacity: 1; r: 5.6px; }
+.leaf-tick {
+  stroke: var(--branch-color);
+  stroke-width: 2.5;
+  opacity: 0.75;
+  transition: opacity 140ms ease, stroke-width 140ms ease;
+}
+.leaf-tick.is-muted { opacity: 0.08; }
+.leaf-tick.is-group-active { opacity: 1; stroke-width: 4; }
+
+.leaf-label {
+  fill: #fff;
+  font-family: "Noto Sans Thai", system-ui, sans-serif;
+  font-size: 19px;
+  font-weight: 500;
+  paint-order: stroke;
+  stroke: #000;
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  transition: opacity 140ms ease;
+}
+.leaf-label.is-muted { opacity: 0.12; }
+.labels-hidden .tree-labels { display: none; }
+
+.tree-center circle { fill: var(--trunk); stroke: #000; stroke-width: 2; }
+
+.leaf-avatar {
+  --avatar-color: #fff;
+  position: absolute;
+  width: 78px;
+  height: 112px;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: opacity 140ms ease, filter 140ms ease, transform 140ms ease;
+}
+.leaf-avatar model-viewer { width: 100%; height: 100%; background: transparent; --progress-bar-color: var(--avatar-color); pointer-events: none; }
+.leaf-avatar::after {
+  content: attr(data-id);
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  min-width: 24px;
+  padding: 2px 4px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.46);
+  background: rgba(0, 0, 0, 0.88);
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 14px;
+  line-height: 1;
+}
+.leaf-avatar:hover,
+.leaf-avatar:focus-visible,
+.leaf-avatar.is-selected { z-index: 80 !important; transform: scale(1.18); }
+.leaf-avatar:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.leaf-avatar.is-selected::before {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 3px solid var(--avatar-color);
+  border-radius: 50%;
+}
+.leaf-avatar.is-muted { opacity: 0.12; filter: saturate(0.15); }
+.leaf-avatar.is-group-active::after { border-color: var(--avatar-color); color: var(--avatar-color); }
+.leaf-avatar.has-warning::after { border-color: #ff6262; color: #ff8787; }
+
+.tree-zoom {
+  position: absolute;
+  z-index: 20;
+  right: 27px;
+  bottom: 52px;
+  display: grid;
+  grid-template-columns: 34px 56px 34px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(0, 0, 0, 0.9);
+}
+.tree-zoom button,
+.tree-zoom output {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+}
+.tree-zoom output { font-size: 9px; }
+.tree-zoom > :last-child { border-right: 0; }
+.tree-zoom button { cursor: pointer; }
+.tree-zoom button:hover { background: #fff; color: #000; }
+
+.navigation-hint,
+.interpretation-note,
+.selected-leaf,
+.branch-navigator {
+  position: absolute;
+  z-index: 14;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: rgba(0, 0, 0, 0.88);
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  backdrop-filter: blur(10px);
+}
+.navigation-hint { right: 27px; bottom: 15px; padding: 5px 7px; font-size: 8px; letter-spacing: 0.05em; text-transform: uppercase; pointer-events: none; }
+.selected-leaf { left: 28px; top: 62px; max-width: 360px; padding: 8px 10px; display: grid; gap: 2px; }
+.selected-leaf strong { font-size: 10px; font-weight: 500; }
+.selected-leaf span { color: var(--muted); font-family: "Noto Sans Thai", system-ui, sans-serif; font-size: 10px; }
+.branch-navigator {
+  left: 28px;
+  bottom: 42px;
+  min-height: 34px;
+  display: flex;
+  align-items: stretch;
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.branch-navigator-label,
+.branch-status {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  color: var(--muted);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.branch-navigator-label { border-right: 1px solid var(--line); }
+.branch-status { min-width: 96px; border-left: 1px solid var(--line); }
+.branch-groups { display: flex; align-items: stretch; }
+.branch-navigator button {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 8px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.branch-navigator button:hover { background: rgba(255, 255, 255, 0.16); }
+.branch-navigator button:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+.branch-group-button { position: relative; padding-left: 18px !important; }
+.branch-group-button::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  width: 6px;
+  height: 12px;
+  transform: translateY(-50%);
+  background: var(--group-color);
+}
+.branch-group-button[aria-pressed="true"] { background: var(--group-color); color: #000; }
+.branch-group-button[aria-pressed="true"]::before { background: #000; }
+#branch-all[aria-pressed="true"] { background: #fff; color: #000; }
+.interpretation-note { left: 28px; bottom: 13px; margin: 0; padding: 4px 7px; border-color: rgba(255, 255, 255, 0.22); color: var(--muted); font-size: 7px; text-transform: uppercase; }
+
+.loading-overlay {
+  position: absolute;
+  z-index: 90;
+  left: 50%;
+  top: 50%;
+  width: min(390px, calc(100vw - 40px));
+  padding: 20px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.97);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.8);
+  transition: opacity 350ms ease, visibility 350ms ease;
+}
+.loading-overlay.is-ready { opacity: 0; visibility: hidden; }
+.loading-copy span { display: block; margin-bottom: 3px; color: #fff; font-family: "IBM Plex Mono", monospace; font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; }
+.loading-copy strong { display: block; font-family: Pridi, serif; font-size: 25px; font-weight: 300; }
+.loading-track { height: 3px; margin-top: 15px; overflow: hidden; background: #333; }
+.loading-track span { display: block; width: 0; height: 100%; background: #fff; transition: width 180ms ease; }
+
+.fatal-error {
+  position: absolute;
+  z-index: 100;
+  inset: 20px;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  padding: 30px;
+  border: 1px solid #fff;
+  background: #000;
+  text-align: center;
+}
+.fatal-error[hidden] { display: none; }
+.fatal-error strong { font-family: Pridi, serif; font-size: 26px; font-weight: 300; }
+.fatal-error span { color: var(--muted); font-size: 11px; }
+.fatal-error code { padding: 7px 10px; background: #161616; color: #fff; }
+
+@media (max-width: 680px) {
+  .circular-atlas { min-height: 500px; }
+  .tree-actions { left: 8px; right: 8px; top: 8px; width: auto; justify-content: stretch; }
+  .tree-actions > * { flex: 1; padding: 6px 3px; text-align: center; font-size: 6px; }
+  .selected-leaf { left: 8px; top: 52px; max-width: calc(100vw - 16px); }
+  .branch-navigator { left: 8px; right: 8px; bottom: 42px; overflow: hidden; }
+  .branch-navigator-label,
+  .branch-status { display: none; }
+  .branch-groups { flex: 1; }
+  .branch-navigator button { min-width: 29px; padding: 0 5px; }
+  .branch-group-button { flex: 1; padding-left: 14px !important; }
+  .branch-group-button::before { left: 5px; width: 5px; }
+  .interpretation-note { display: none; }
+  .tree-zoom { right: 9px; bottom: 84px; }
+  .navigation-hint { right: 9px; bottom: 12px; max-width: calc(100vw - 18px); font-size: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
