@@ -8,7 +8,7 @@
       content="An organic embedding of 59 animated Thai dance movements connected to six movement elements."
     />
     <title>Cyber Subin 2.0 — Six-Element Embedding</title>
-    <link rel="stylesheet" href="/src/element-embedding.css" />
+    <link rel="stylesheet" href="/src/element-embedding.css?v=movement-names-2" />
     <script type="module" src="/vendor/model-viewer/model-viewer.min.js"></script>
   </head>
   <body>
@@ -40,6 +40,19 @@
 
         <div id="avatar-layer" class="avatar-layer" aria-label="59 animated Thai dance movements"></div>
 
+        <aside class="embedding-display-controls" aria-label="Avatar display controls">
+          <label for="embedding-avatar-size">
+            <span>AVATAR SIZE</span>
+            <output id="embedding-avatar-size-value" for="embedding-avatar-size">100%</output>
+          </label>
+          <input id="embedding-avatar-size" type="range" min="50" max="180" value="100" step="5" disabled />
+          <label for="embedding-avatar-spread">
+            <span>AVATAR SPREAD</span>
+            <output id="embedding-avatar-spread-value" for="embedding-avatar-spread">100%</output>
+          </label>
+          <input id="embedding-avatar-spread" type="range" min="70" max="180" value="100" step="5" disabled />
+        </aside>
+
         <aside id="selection-panel" class="selection-panel" aria-live="polite">
           <span class="selection-panel__eyebrow">MOVEMENT EMBEDDING</span>
           <strong>HOVER A DANCE OR ELEMENT</strong>
@@ -58,6 +71,6 @@
       </section>
     </main>
 
-    <script type="module" src="/src/element-embedding.js"></script>
+    <script type="module" src="/src/element-embedding.js?v=movement-names-1"></script>
   </body>
 </html>

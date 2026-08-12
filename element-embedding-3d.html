@@ -8,7 +8,7 @@
       content="A rotatable organic three-dimensional embedding of 59 animated Thai dance movements and six movement elements."
     />
     <title>Cyber Subin 2.0 — 3D Element Embedding</title>
-    <link rel="stylesheet" href="/src/element-embedding-3d.css" />
+    <link rel="stylesheet" href="/src/element-embedding-3d.css?v=movement-names-2" />
     <script type="importmap">
       {
         "imports": {
@@ -42,6 +42,19 @@
         <div id="space-movement-labels" class="space-movement-labels" aria-hidden="true"></div>
         <div id="space-element-labels" class="space-element-labels" aria-hidden="true"></div>
 
+        <aside class="space-display-controls" aria-label="Avatar display controls">
+          <label for="space-avatar-size">
+            <span>AVATAR SIZE</span>
+            <output id="space-avatar-size-value" for="space-avatar-size">100%</output>
+          </label>
+          <input id="space-avatar-size" type="range" min="50" max="180" value="100" step="5" disabled />
+          <label for="space-avatar-spread">
+            <span>AVATAR SPREAD</span>
+            <output id="space-avatar-spread-value" for="space-avatar-spread">100%</output>
+          </label>
+          <input id="space-avatar-spread" type="range" min="70" max="180" value="100" step="5" disabled />
+        </aside>
+
         <div class="space-instructions">
           <strong>ORBIT THE EMBEDDING</strong>
           <span>DRAG TO ROTATE · SCROLL TO ZOOM · RIGHT-DRAG TO PAN</span>
@@ -65,6 +78,6 @@
       </section>
     </main>
 
-    <script type="module" src="/src/element-embedding-3d.js"></script>
+    <script type="module" src="/src/element-embedding-3d.js?v=label-anchor-1"></script>
   </body>
 </html>

@@ -7,6 +7,7 @@ const PLAYBACK_SPEED = 3;
 const TARGET_HEAD_TO_HIPS = 0.45;
 const MODEL_WORKERS = 6;
 const EMBEDDING_SPREAD = 1.55;
+const AVATAR_COLOR = "#ff8066";
 
 const ELEMENTS = [
   { id: "energy", label: "ENERGY", field: "avg_energy_percentage", color: "#65f3ff", anchor: [-1.4, 5.1, -2.9] },
@@ -31,6 +32,8 @@ const state = {
   playing: true,
   linksVisible: true,
   curvedLinks: true,
+  avatarSize: 1,
+  avatarSpread: 1,
   sceneReady: false,
 };
 
@@ -50,6 +53,10 @@ const ui = {
   lineStyleButton: document.getElementById("space-line-style"),
   autoRotateButton: document.getElementById("space-auto-rotate"),
   resetButton: document.getElementById("space-reset-view"),
+  avatarSizeSlider: document.getElementById("space-avatar-size"),
+  avatarSizeValue: document.getElementById("space-avatar-size-value"),
+  avatarSpreadSlider: document.getElementById("space-avatar-spread"),
+  avatarSpreadValue: document.getElementById("space-avatar-spread-value"),
 };
 
 let renderer;
@@ -63,8 +70,11 @@ let gltfLoader;
 let dracoLoader;
 let animationFrame;
 let resizeObserver;
+let connectionRefreshTimer;
 const clock = new THREE.Clock();
 const projectionVector = new THREE.Vector3();
+const labelWorldPosition = new THREE.Vector3();
+const labelToCamera = new THREE.Vector3();
 const cameraDirection = new THREE.Vector3();
 
 init();
@@ -95,14 +105,17 @@ async function init() {
 
     const movementPositions = projectEmbeddingTo3D(state.movements.map((movement) => movement.embedding));
     state.movementPositions = movementPositions;
-    createMovementLabels(movementPositions);
+    const displayPositions = currentMovementPositions();
+    createMovementLabels(displayPositions);
     createElementNodes();
-    createConnections(movementPositions);
+    createConnections(displayPositions);
     createSpatialParticles();
     state.sceneReady = true;
     ui.loadingDetail.textContent = "LOADING 59 ANIMATED GLB MODELS";
 
-    await loadAllMovements(movementPositions);
+    await loadAllMovements(displayPositions);
+    ui.avatarSizeSlider.disabled = false;
+    ui.avatarSpreadSlider.disabled = false;
     ui.root.setAttribute("aria-busy", "false");
     revealScene();
 
@@ -203,8 +216,20 @@ function bindControls() {
     ui.lineStyleButton.textContent = state.curvedLinks ? "CURVED LINES" : "STRAIGHT LINES";
     ui.lineStyleButton.setAttribute("aria-pressed", String(state.curvedLinks));
     if (state.movementPositions.length) {
-      createConnections(state.movementPositions, state.curvedLinks);
+      createConnections(currentMovementPositions(), state.curvedLinks);
     }
+  });
+
+  ui.avatarSizeSlider.addEventListener("input", () => {
+    state.avatarSize = Number(ui.avatarSizeSlider.value) / 100;
+    ui.avatarSizeValue.value = `${ui.avatarSizeSlider.value}%`;
+    applyAvatarSize();
+  });
+
+  ui.avatarSpreadSlider.addEventListener("input", () => {
+    state.avatarSpread = Number(ui.avatarSpreadSlider.value) / 100;
+    ui.avatarSpreadValue.value = `${ui.avatarSpreadSlider.value}%`;
+    applyAvatarSpread();
   });
 
   ui.autoRotateButton.addEventListener("click", () => {
@@ -221,6 +246,35 @@ function resetView() {
   camera.position.set(10.8, 7.2, 12.8);
   controls.target.set(0, 0, 0);
   controls.update();
+}
+
+function currentMovementPositions() {
+  return state.movementPositions.map((position) => (
+    position.clone().multiplyScalar(state.avatarSpread)
+  ));
+}
+
+function applyAvatarSize() {
+  state.movementItems.forEach((item) => {
+    if (!item.root) return;
+    item.scale = item.baseScale * state.avatarSize;
+    item.root.scale.setScalar(item.scale);
+    updateMovementAnchor(item, true);
+  });
+  ui.canvas.dataset.avatarScale = state.avatarSize.toFixed(2);
+}
+
+function applyAvatarSpread() {
+  const positions = currentMovementPositions();
+  state.movementItems.forEach((item, index) => {
+    item.target.copy(positions[index]);
+    updateMovementAnchor(item, true);
+  });
+  ui.canvas.dataset.avatarSpread = state.avatarSpread.toFixed(2);
+  window.clearTimeout(connectionRefreshTimer);
+  connectionRefreshTimer = window.setTimeout(() => {
+    createConnections(positions, state.curvedLinks);
+  }, 70);
 }
 
 function validateData() {
@@ -323,10 +377,11 @@ function createMovementLabels(positions) {
     const dominant = dominantElement(row);
     const label = document.createElement("span");
     label.className = "space-movement-label";
-    label.textContent = String(movement.id).padStart(2, "0");
+    label.textContent = movement.thai;
+    label.lang = "th";
     label.title = `${movement.thai} — ${movement.english}`;
     label.dataset.dominantElement = dominant.id;
-    label.style.setProperty("--dominant-color", dominant.color);
+    label.style.setProperty("--dominant-color", AVATAR_COLOR);
     fragment.appendChild(label);
     state.movementItems.push({
       movement,
@@ -337,6 +392,7 @@ function createMovementLabels(positions) {
       root: null,
       mixer: null,
       duration: 0,
+      baseScale: 1,
       scale: 1,
       centerTrack: movement.skeleton?.center_track || [],
       lastCenterIndex: -1,
@@ -344,6 +400,9 @@ function createMovementLabels(positions) {
   });
   ui.movementLabels.appendChild(fragment);
   ui.canvas.dataset.dominantCounts = JSON.stringify(dominantElementCounts(state.movementItems));
+  ui.canvas.dataset.avatarColor = AVATAR_COLOR;
+  ui.canvas.dataset.avatarScale = state.avatarSize.toFixed(2);
+  ui.canvas.dataset.avatarSpread = state.avatarSpread.toFixed(2);
 }
 
 function createElementNodes() {
@@ -499,8 +558,8 @@ async function loadMovement(item, targetPosition) {
     root.name = `movement-${item.movement.id}`;
     root.userData.movementId = item.movement.id;
     root.userData.dominantElement = item.dominant.id;
-    root.userData.dominantColor = item.dominant.color;
-    const dominantColor = new THREE.Color(item.dominant.color);
+    root.userData.avatarColor = AVATAR_COLOR;
+    const avatarColor = new THREE.Color(AVATAR_COLOR);
     let recoloredMaterials = 0;
     root.traverse((object) => {
       if (!object.isMesh && !object.isSkinnedMesh) return;
@@ -511,9 +570,9 @@ async function loadMovement(item, targetPosition) {
       const materials = (Array.isArray(object.material) ? object.material : [object.material])
         .map((sourceMaterial) => {
           const material = sourceMaterial.clone();
-          if (material.color) material.color.copy(dominantColor);
+          if (material.color) material.color.copy(avatarColor);
           if (material.emissive) {
-            material.emissive.copy(dominantColor).multiplyScalar(0.055);
+            material.emissive.copy(avatarColor).multiplyScalar(0.055);
             material.emissiveIntensity = 0.55;
           }
           material.side = THREE.DoubleSide;
@@ -529,7 +588,8 @@ async function loadMovement(item, targetPosition) {
     const skeletonSize = item.movement.skeleton?.calibration_head_to_hips_distance
       || item.movement.skeleton?.head_to_hips_distance
       || 66.2;
-    item.scale = TARGET_HEAD_TO_HIPS / skeletonSize;
+    item.baseScale = TARGET_HEAD_TO_HIPS / skeletonSize;
+    item.scale = item.baseScale * state.avatarSize;
     root.scale.setScalar(item.scale);
     item.root = root;
     item.target.copy(targetPosition);
@@ -614,9 +674,9 @@ function updateScreenLabels() {
   camera.getWorldDirection(cameraDirection);
 
   state.movementItems.forEach((item) => {
-    projectionVector.copy(item.target);
-    projectionVector.y -= 0.43;
-    positionLabel(item.label, projectionVector, width, height, false);
+    labelWorldPosition.copy(item.target);
+    labelWorldPosition.y -= 0.52 * state.avatarSize;
+    positionLabel(item.label, labelWorldPosition, width, height, false);
   });
 
   state.elementItems.forEach((item) => {
@@ -625,8 +685,10 @@ function updateScreenLabels() {
 }
 
 function positionLabel(label, worldPosition, width, height, isElement) {
-  const toPoint = projectionVector.copy(worldPosition).sub(camera.position);
-  const inFront = toPoint.dot(cameraDirection) > 0;
+  const inFront = labelToCamera
+    .copy(worldPosition)
+    .sub(camera.position)
+    .dot(cameraDirection) > 0;
   projectionVector.copy(worldPosition).project(camera);
   const visible = inFront && projectionVector.z > -1 && projectionVector.z < 1;
 
@@ -783,6 +845,7 @@ function clamp(value, minimum, maximum) {
 
 window.addEventListener("beforeunload", () => {
   if (animationFrame) cancelAnimationFrame(animationFrame);
+  window.clearTimeout(connectionRefreshTimer);
   resizeObserver?.disconnect();
   disposeConnections();
   dracoLoader?.dispose();

@@ -1,6 +1,7 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 const PLAYBACK_SPEED = 3;
 const EMBEDDING_SPREAD_2D = 1.1;
+const AVATAR_COLOR = "#ff8066";
 
 const ELEMENTS = [
   {
@@ -63,6 +64,8 @@ const state = {
   playing: true,
   linksVisible: true,
   curvedLinks: true,
+  avatarSize: 1,
+  avatarSpread: 1,
   selected: null,
   settledModels: 0,
   loadedModels: 0,
@@ -85,6 +88,10 @@ const ui = {
   animationButton: document.getElementById("toggle-animation"),
   linksButton: document.getElementById("toggle-links"),
   lineStyleButton: document.getElementById("toggle-line-style"),
+  avatarSizeSlider: document.getElementById("embedding-avatar-size"),
+  avatarSizeValue: document.getElementById("embedding-avatar-size-value"),
+  avatarSpreadSlider: document.getElementById("embedding-avatar-spread"),
+  avatarSpreadValue: document.getElementById("embedding-avatar-spread-value"),
 };
 
 init();
@@ -120,6 +127,8 @@ async function init() {
     renderNetworkStructure();
     layoutNetwork();
     startSkeletonTracking();
+    ui.avatarSizeSlider.disabled = false;
+    ui.avatarSpreadSlider.disabled = false;
 
     const resizeObserver = new ResizeObserver(layoutNetwork);
     resizeObserver.observe(ui.stage);
@@ -159,6 +168,21 @@ function bindGlobalControls() {
     ui.lineStyleButton.textContent = state.curvedLinks ? "CURVED LINES" : "STRAIGHT LINES";
     ui.lineStyleButton.setAttribute("aria-pressed", String(state.curvedLinks));
     ui.stage.dataset.lineStyle = state.curvedLinks ? "curved" : "straight";
+    layoutNetwork();
+  });
+
+  ui.avatarSizeSlider.addEventListener("input", () => {
+    state.avatarSize = Number(ui.avatarSizeSlider.value) / 100;
+    ui.avatarSizeValue.value = `${ui.avatarSizeSlider.value}%`;
+    ui.stage.style.setProperty("--avatar-size", state.avatarSize.toFixed(2));
+    ui.stage.dataset.avatarScale = state.avatarSize.toFixed(2);
+    layoutNetwork();
+  });
+
+  ui.avatarSpreadSlider.addEventListener("input", () => {
+    state.avatarSpread = Number(ui.avatarSpreadSlider.value) / 100;
+    ui.avatarSpreadValue.value = `${ui.avatarSpreadSlider.value}%`;
+    ui.stage.dataset.avatarSpread = state.avatarSpread.toFixed(2);
     layoutNetwork();
   });
 
@@ -214,7 +238,7 @@ function renderAvatarNodes() {
     );
     node.title = `${String(movement.id).padStart(2, "0")} · ${movement.thai} — ${movement.english}`;
     node.style.zIndex = String(100 + movement.id);
-    node.style.setProperty("--dominant-color", dominant.color);
+    node.style.setProperty("--dominant-color", AVATAR_COLOR);
     node.dataset.dominantElement = dominant.id;
 
     const viewer = document.createElement("model-viewer");
@@ -245,10 +269,12 @@ function renderAvatarNodes() {
       viewer.setAttribute("camera-target", vectorToTarget(calibrationCenter));
     }
 
-    const number = document.createElement("span");
-    number.className = "dance-node__number";
-    number.textContent = String(movement.id).padStart(2, "0");
-    node.append(viewer, number);
+    const name = document.createElement("span");
+    name.className = "dance-node__name";
+    name.textContent = movement.thai;
+    name.lang = "th";
+    name.title = movement.english;
+    node.append(viewer, name);
 
     const item = {
       movement,
@@ -266,7 +292,7 @@ function renderAvatarNodes() {
       item.loaded = true;
       viewer.timeScale = PLAYBACK_SPEED;
       viewer.currentTime = movement.skeleton?.calibration_time_seconds || 0;
-      recolorModelViewer(viewer, dominant);
+      recolorModelViewer(viewer);
       setCalibrationCenter(item);
       viewer.jumpCameraToGoal?.();
       if (state.playing) viewer.play?.();
@@ -286,6 +312,9 @@ function renderAvatarNodes() {
 
   ui.avatarLayer.appendChild(fragment);
   ui.stage.dataset.dominantCounts = JSON.stringify(dominantElementCounts(state.items));
+  ui.stage.dataset.avatarColor = AVATAR_COLOR;
+  ui.stage.dataset.avatarScale = state.avatarSize.toFixed(2);
+  ui.stage.dataset.avatarSpread = state.avatarSpread.toFixed(2);
 }
 
 function renderNetworkStructure() {
@@ -381,13 +410,13 @@ function layoutNetwork() {
 
   const centerX = width * 0.5;
   const centerY = height * 0.5;
-  const avatarMargin = width < 700 ? 30 : 45;
+  const avatarMargin = (width < 700 ? 30 : 45) * state.avatarSize;
   const halfCloudWidth = Math.min(
-    Math.max(120, Math.min(width * 0.31, height * 0.59) * EMBEDDING_SPREAD_2D),
+    Math.max(120, Math.min(width * 0.31, height * 0.59) * EMBEDDING_SPREAD_2D * state.avatarSpread),
     width * 0.5 - avatarMargin,
   );
   const halfCloudHeight = Math.min(
-    Math.max(110, Math.min(height * 0.35, width * 0.34) * EMBEDDING_SPREAD_2D),
+    Math.max(110, Math.min(height * 0.35, width * 0.34) * EMBEDDING_SPREAD_2D * state.avatarSpread),
     height * 0.5 - avatarMargin,
   );
 
@@ -700,9 +729,9 @@ function dominantElementCounts(items) {
   ]));
 }
 
-function recolorModelViewer(viewer, dominant) {
+function recolorModelViewer(viewer) {
   const materials = viewer.model?.materials || [];
-  const color = hexToRgba(dominant.color);
+  const color = hexToRgba(AVATAR_COLOR);
   let applied = 0;
   materials.forEach((material) => {
     try {
@@ -712,7 +741,7 @@ function recolorModelViewer(viewer, dominant) {
       console.warn(`Could not recolor ${material.name || "model material"}`, error);
     }
   });
-  viewer.dataset.dominantElement = dominant.id;
+  viewer.dataset.avatarColor = AVATAR_COLOR;
   viewer.dataset.recoloredMaterials = String(applied);
 }
 

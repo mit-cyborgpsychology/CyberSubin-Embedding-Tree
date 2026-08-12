@@ -189,7 +189,7 @@ a {
 }
 
 .dance-node {
-  --avatar-scale: 1;
+  --avatar-scale: var(--avatar-size, 1);
   --dominant-color: #fff;
   position: absolute;
   width: 58px;
@@ -208,7 +208,7 @@ a {
 .dance-node:hover,
 .dance-node:focus-visible,
 .dance-node.is-active {
-  --avatar-scale: 1.22;
+  --avatar-scale: calc(var(--avatar-size, 1) + 0.22);
   z-index: 1000 !important;
   filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.35));
 }
@@ -231,20 +231,74 @@ a {
   --poster-color: transparent;
 }
 
-.dance-node__number {
+.dance-node__name {
   position: absolute;
   left: 50%;
-  bottom: 0;
-  min-width: 27px;
-  padding: 2px 4px;
+  bottom: -2px;
+  width: max-content;
+  min-width: 76px;
+  max-width: 180px;
+  padding: 3px 6px;
   border: 1px solid color-mix(in srgb, var(--dominant-color), transparent 24%);
   background: rgba(0, 0, 0, 0.82);
   color: var(--dominant-color);
-  font: 700 9px/1.1 ui-monospace, "SFMono-Regular", Menlo, monospace;
-  letter-spacing: 0.08em;
+  font: 700 7px/1.1 var(--font);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
   text-align: center;
-  transform: translateX(-50%);
+  transform: translate(-50%, 100%);
   box-shadow: 0 0 7px color-mix(in srgb, var(--dominant-color), transparent 66%);
+}
+
+.embedding-display-controls {
+  position: absolute;
+  z-index: 20;
+  top: 18px;
+  right: 18px;
+  width: min(250px, calc(100vw - 36px));
+  padding: 13px 15px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(3, 4, 5, 0.84);
+  backdrop-filter: blur(14px);
+}
+
+.embedding-display-controls label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  color: #daddd9;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+}
+
+.embedding-display-controls label:not(:first-child) {
+  margin-top: 13px;
+}
+
+.embedding-display-controls output {
+  color: #ff8066;
+  font: 700 9px/1 ui-monospace, "SFMono-Regular", Menlo, monospace;
+  letter-spacing: 0.04em;
+}
+
+.embedding-display-controls input[type="range"] {
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  accent-color: #ff8066;
+  cursor: ew-resize;
+}
+
+.embedding-display-controls input[type="range"]:disabled {
+  cursor: wait;
+  opacity: 0.42;
+}
+
+.embedding-display-controls input[type="range"]:focus-visible {
+  outline: 1px solid #fff;
+  outline-offset: 3px;
 }
 
 .element-node {
@@ -445,6 +499,13 @@ a {
     left: 10px;
     bottom: 10px;
     width: calc(100vw - 20px);
+  }
+
+  .embedding-display-controls {
+    top: 10px;
+    right: 10px;
+    width: 205px;
+    padding: 10px 12px 11px;
   }
 }
 
