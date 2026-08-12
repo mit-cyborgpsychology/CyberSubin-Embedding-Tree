@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A rotatable organic three-dimensional embedding of 59 animated Thai dance movements and six movement elements."
+    />
+    <title>Cyber Subin 2.0 — 3D Element Embedding</title>
+    <link rel="stylesheet" href="/src/element-embedding-3d.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three/build/three.module.js",
+          "three/addons/": "/vendor/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="element-space" class="element-space" aria-busy="true">
+      <header class="space-header">
+        <a class="space-header__brand" href="/">CYBER SUBIN 2.0 LAB</a>
+        <div class="space-header__title">
+          <strong>3D ELEMENT EMBEDDING</strong>
+          <span>16D EMBEDDING → ORGANIC 3D PCA · MOVEMENTS 01–59</span>
+        </div>
+        <nav class="space-header__nav" aria-label="3D embedding controls and navigation">
+          <button id="space-toggle-animation" type="button" aria-pressed="true">PAUSE ALL</button>
+          <button id="space-toggle-links" type="button" aria-pressed="true">HIDE LINKS</button>
+          <button id="space-line-style" type="button" aria-pressed="true">CURVED LINES</button>
+          <button id="space-auto-rotate" type="button" aria-pressed="false">AUTO ROTATE</button>
+          <button id="space-reset-view" type="button">RESET VIEW</button>
+          <a href="/element-embedding.html">2D MAP</a>
+          <a class="active" href="/element-embedding-3d.html" aria-current="page">3D MAP</a>
+        </nav>
+      </header>
+
+      <section id="space-stage" class="space-stage" aria-label="Rotatable organic 3D dance movement embedding">
+        <canvas id="space-canvas" aria-label="3D visualization; drag to rotate and scroll to zoom"></canvas>
+        <div id="space-movement-labels" class="space-movement-labels" aria-hidden="true"></div>
+        <div id="space-element-labels" class="space-element-labels" aria-hidden="true"></div>
+
+        <div class="space-instructions">
+          <strong>ORBIT THE EMBEDDING</strong>
+          <span>DRAG TO ROTATE · SCROLL TO ZOOM · RIGHT-DRAG TO PAN</span>
+        </div>
+
+        <div id="space-status" class="space-status" aria-live="polite">
+          <span>ANIMATED GLB MODELS</span>
+          <strong><b id="space-loaded-count">0</b> / 59</strong>
+        </div>
+
+        <div id="space-loading" class="space-loading" role="status" aria-live="polite">
+          <span class="space-loading__orbit"><i></i><i></i><i></i></span>
+          <strong>BUILDING 3D EMBEDDING</strong>
+          <small id="space-loading-detail">PROJECTING 16D MOVEMENT EMBEDDINGS</small>
+        </div>
+
+        <div id="space-error" class="space-error" hidden>
+          <strong>THE 3D ELEMENT EMBEDDING COULD NOT LOAD</strong>
+          <span id="space-error-message"></span>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/element-embedding-3d.js"></script>
+  </body>
+</html>

@@ -2,18 +2,860 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="refresh" content="0; url=avatar-map.html" />
-    <meta name="robots" content="noindex" />
-    <title>CyberSubin-Embedding Map and Tree</title>
-    <style>
-      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #000; color: #fff; }
-      body { min-height: 100vh; margin: 0; display: grid; place-items: center; }
-      a { color: #fff; }
-    </style>
-    <script>window.location.replace("avatar-map.html");</script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="An interactive 3D motion atlas for 59 indexed Thai traditional dance movements."
+    />
+    <title>Cyber Subin 2.0 Lab</title>
   </head>
   <body>
-    <p>Opening the <a href="avatar-map.html">all-avatar embedding map</a>…</p>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Cyber Subin 2.0 Lab home">
+          <span class="brand-copy">
+            <strong>CYBER SUBIN 2.0 LAB</strong>
+          </span>
+        </a>
+
+        <div class="movement-picker">
+          <label for="dance-select">SELECT MOVEMENT / เลือกท่ารำ</label>
+          <div class="movement-picker-row">
+            <div class="select-wrap">
+              <select id="dance-select" aria-label="Select a Thai dance movement"></select>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m5 7.5 5 5 5-5" />
+              </svg>
+            </div>
+            <button id="add-to-sequence" class="add-to-sequence-button" type="button">
+              <span aria-hidden="true">＋</span>
+              <strong>ADD TO<br>SEQUENCE</strong>
+            </button>
+          </div>
+        </div>
+
+        <nav class="view-switcher" aria-label="View navigation">
+          <div class="nav-utility-group" aria-label="Display utilities">
+            <button id="reset-all" class="nav-action nav-action--reset" type="button">RESET ALL</button>
+            <button id="hide-control-buttons" class="nav-action" type="button" aria-pressed="false">HIDE BUTTONS</button>
+            <button id="hide-all-ui" class="nav-action" type="button" aria-pressed="false">PRESENTATION MODE</button>
+          </div>
+          <div class="nav-view-group" aria-label="Choose view">
+            <a class="view-tab active" href="/" aria-current="page">SINGLE VIEW</a>
+            <a id="grid-view-link" class="view-tab" href="/grid.html">GRID VIEW</a>
+            <a class="view-tab" href="/element-embedding.html">ELEMENT MAP</a>
+            <a class="view-tab" href="/element-embedding-3d.html">3D MAP</a>
+          </div>
+        </nav>
+      </header>
+
+      <main class="workspace">
+        <section class="viewer-panel" aria-label="Interactive 3D movement viewer">
+          <div id="scene-wrap" class="scene-wrap">
+            <canvas id="three-canvas"></canvas>
+
+            <div id="no60-comparison-overlay" class="no60-comparison-overlay" aria-hidden="true" hidden>
+              <span>ORIGINAL</span>
+              <i></i>
+              <span>MODIFIED</span>
+            </div>
+
+            <div class="loading-state" id="loading-state" role="status" aria-live="polite">
+              <div class="loading-orbit"><span></span><span></span></div>
+              <p>LOADING MOTION MODEL</p>
+              <strong id="loading-progress">0%</strong>
+            </div>
+
+            <div id="viewer-options" class="viewer-options">
+              <section class="control-section control-section--avatar-style" aria-label="Avatar appearance controls">
+                <button
+                  id="avatar-style-toggle"
+                  class="control-section-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="avatar-style-panel"
+                >
+                  <span>AVATAR STYLE</span><strong id="avatar-style-status">SHOW</strong>
+                </button>
+                <div id="avatar-style-panel" class="control-section-panel avatar-style-panel" hidden>
+                  <div class="menu-panel-header">
+                    <span>AVATAR STYLE</span>
+                    <button id="avatar-style-close" class="menu-panel-close" type="button" aria-label="Close Avatar Style">×</button>
+                  </div>
+                  <div class="avatar-style-control" aria-label="Avatar color, gradient, surface, and lighting controls">
+                    <div class="flow-color-group avatar-solid-color-group" aria-label="Solid avatar color control">
+                      <span>AVATAR COLOR</span>
+                      <label for="avatar-solid-color">
+                        PICK ANY COLOR
+                        <input id="avatar-solid-color" type="color" value="#d9dcde" aria-label="Custom solid avatar color">
+                      </label>
+                    </div>
+                    <div class="flow-color-group avatar-gradient-group" aria-label="Custom avatar body gradient">
+                      <span>CUSTOM BODY GRADIENT</span>
+                      <label for="avatar-gradient-top">
+                        TOP
+                        <input id="avatar-gradient-top" data-avatar-gradient-stop="top" type="color" value="#d9dcde" aria-label="Avatar gradient top color">
+                      </label>
+                      <label for="avatar-gradient-middle">
+                        MIDDLE
+                        <input id="avatar-gradient-middle" data-avatar-gradient-stop="middle" type="color" value="#d9dcde" aria-label="Avatar gradient middle color">
+                      </label>
+                      <label for="avatar-gradient-bottom">
+                        BOTTOM
+                        <input id="avatar-gradient-bottom" data-avatar-gradient-stop="bottom" type="color" value="#d9dcde" aria-label="Avatar gradient bottom color">
+                      </label>
+                    </div>
+                    <div class="trace-option-group option-row--compact option-row--two" aria-label="Avatar surface">
+                      <span>SURFACE</span>
+                      <button type="button" data-avatar-surface="smooth" class="active">SMOOTH</button>
+                      <button type="button" data-avatar-surface="rough">ROUGH</button>
+                      <button type="button" data-avatar-surface="points">POINT CLOUD</button>
+                      <button type="button" data-avatar-surface="skeleton">SKELETON</button>
+                    </div>
+                    <label class="flow-slider-group avatar-opacity-control" for="avatar-opacity">
+                      <span>AVATAR OPACITY <output id="avatar-opacity-value" for="avatar-opacity">100%</output></span>
+                      <input id="avatar-opacity" type="range" min="0" max="1" step="0.01" value="1" aria-label="Avatar opacity">
+                    </label>
+                    <div class="trace-option-group option-grid--two" aria-label="Avatar lighting">
+                      <span>LIGHTING</span>
+                      <button type="button" data-lighting-preset="studio">STUDIO</button>
+                      <button type="button" data-lighting-preset="bright">BRIGHT</button>
+                      <button type="button" data-lighting-preset="softFront">SOFT FRONT</button>
+                      <button type="button" data-lighting-preset="side">SIDE LIGHT</button>
+                      <button type="button" data-lighting-preset="highSide">HIGH SIDE</button>
+                      <button type="button" data-lighting-preset="cross">CROSS LIGHT</button>
+                      <button type="button" data-lighting-preset="lowKey">LOW KEY</button>
+                      <button type="button" data-lighting-preset="top" class="active">TOP LIGHT</button>
+                      <button type="button" data-lighting-preset="rim">RIM</button>
+                      <button type="button" data-lighting-preset="softSilhouette">SOFT SIL</button>
+                      <button type="button" data-lighting-preset="backlight">BACKLIGHT</button>
+                      <button type="button" data-lighting-preset="silhouette">SILHOUETTE</button>
+                    </div>
+                    <div class="flow-color-group avatar-light-color-group" aria-label="Custom light color control">
+                      <span>LIGHT COLOR</span>
+                      <label for="lighting-custom-color">
+                        PICK ANY COLOR
+                        <input id="lighting-custom-color" type="color" value="#b7c9d3" aria-label="Custom light color">
+                      </label>
+                    </div>
+                    <label class="flow-slider-group avatar-lighting-intensity" for="lighting-intensity">
+                      <span>LIGHTING INTENSITY <output id="lighting-intensity-value" for="lighting-intensity">100%</output></span>
+                      <input id="lighting-intensity" type="range" min="0" max="3" step="0.05" value="1" aria-label="Lighting intensity">
+                    </label>
+                  </div>
+                </div>
+              </section>
+
+              <section class="control-section control-section--camera" aria-label="Camera controls">
+                <button
+                  id="camera-controls-toggle"
+                  class="control-section-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="camera-controls-panel"
+                >
+                  <span>CAMERA CONTROLS</span><strong id="camera-controls-status">SHOW</strong>
+                </button>
+                <div id="camera-controls-panel" class="control-section-panel" hidden>
+                  <div class="menu-panel-header">
+                    <span>CAMERA CONTROLS</span>
+                    <button id="camera-controls-close" class="menu-panel-close" type="button" aria-label="Close Camera Controls">×</button>
+                  </div>
+                  <div class="camera-control" aria-label="Automatic camera orbit controls">
+                    <button
+                      id="camera-orbit-toggle"
+                      class="camera-orbit-toggle"
+                      type="button"
+                      aria-pressed="false"
+                      aria-label="Start automatic camera rotation"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4.5 9A8 8 0 0 1 18 5.5L20 8M19.5 15A8 8 0 0 1 6 18.5L4 16M20 4v4h-4M4 20v-4h4" />
+                      </svg>
+                      <span>AUTO ORBIT</span>
+                      <strong id="camera-orbit-status">OFF</strong>
+                    </button>
+                    <div class="camera-speed-control option-row--compact option-row--two" aria-label="Camera rotation speed">
+                      <span>CAMERA SPEED</span>
+                      <button type="button" data-camera-speed="0.25">0.25×</button>
+                      <button type="button" data-camera-speed="0.5">0.5×</button>
+                      <button type="button" data-camera-speed="1" class="active">1×</button>
+                      <button type="button" data-camera-speed="2">2×</button>
+                    </div>
+                    <div class="camera-direction-control option-row--compact option-row--two" aria-label="Camera rotation direction">
+                      <span>DIRECTION</span>
+                      <button type="button" data-camera-direction="1" class="active" aria-label="Rotate clockwise">CW</button>
+                      <button type="button" data-camera-direction="-1" aria-label="Rotate counterclockwise">CCW</button>
+                    </div>
+                  </div>
+
+                  <div class="avatar-position-control" aria-label="Avatar screen position controls">
+                    <span>AVATAR POSITION</span>
+                    <button type="button" data-avatar-move="left" aria-label="Move avatar left">←</button>
+                    <button type="button" data-avatar-move="up" aria-label="Move avatar up">↑</button>
+                    <button type="button" data-avatar-move="down" aria-label="Move avatar down">↓</button>
+                    <button type="button" data-avatar-move="right" aria-label="Move avatar right">→</button>
+                    <button type="button" data-avatar-move="center" class="avatar-center-button">CENTER</button>
+                    <output id="avatar-position-readout" aria-live="polite">X 0.0 · Y 0.0</output>
+                  </div>
+
+                </div>
+              </section>
+
+              <section class="control-section control-section--line" aria-label="Line controls">
+                <div class="control-section-header control-section-header--line">
+                  <div class="line-display-stack">
+                    <button
+                      id="line-display-toggle"
+                      class="control-section-toggle line-display-toggle"
+                      type="button"
+                      aria-pressed="false"
+                      aria-label="Turn trace display on"
+                    >
+                      <span>TRACE</span><strong id="line-display-status">OFF</strong>
+                    </button>
+                  </div>
+                  <button
+                    id="line-controls-toggle"
+                    class="control-section-toggle line-controls-toggle"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="line-controls-panel"
+                  >
+                    <span>CONTROLS</span><strong id="line-controls-status">SHOW</strong>
+                  </button>
+                </div>
+                <div id="line-controls-panel" class="control-section-panel" hidden>
+                  <div class="menu-panel-header">
+                    <span>TRACE CONTROLS</span>
+                    <button id="line-controls-close" class="menu-panel-close" type="button" aria-label="Close Trace Controls">×</button>
+                  </div>
+                  <div class="trace-control" aria-label="3D trace appearance controls">
+                    <div class="trace-option-group option-grid--two" aria-label="Trace retention">
+                      <span>TRACE</span>
+                      <button type="button" data-trace-mode="permanent" class="active">PERMANENT</button>
+                      <button type="button" data-trace-mode="long">FADE 15S</button>
+                      <button type="button" data-trace-mode="medium">FADE 8S</button>
+                      <button type="button" data-trace-mode="short">FADE 3S</button>
+                      <button type="button" data-trace-mode="brief">FADE 1.5S</button>
+                      <button type="button" data-trace-mode="instant">FADE 1S</button>
+                    </div>
+                    <div class="trace-option-group option-grid--two trace-body-parts" aria-label="Trace body-part visibility">
+                      <span>BODY PARTS · SHOW / HIDE</span>
+                      <button type="button" data-trace-part="body" class="active" aria-pressed="true">BODY</button>
+                      <button type="button" data-trace-part="hand" class="active" aria-pressed="true">HAND</button>
+                      <button type="button" data-trace-part="arm" class="active" aria-pressed="true">ARM</button>
+                      <button type="button" data-trace-part="leg" class="active" aria-pressed="true">LEG</button>
+                      <button type="button" data-trace-part="feet" class="active" aria-pressed="true">FEET</button>
+                      <button type="button" data-trace-part="head" class="active" aria-pressed="true">HEAD</button>
+                      <button type="button" data-trace-all class="active" aria-pressed="true">FULL BODY</button>
+                    </div>
+                    <div class="trace-option-group trace-width-control option-row--compact option-row--two" aria-label="Trace line width">
+                      <span>WIDTH</span>
+                      <button type="button" data-trace-width="0.5">EXTRA THIN</button>
+                      <button type="button" data-trace-width="1.25" class="active">THIN</button>
+                      <button type="button" data-trace-width="2.5">MEDIUM</button>
+                      <button type="button" data-trace-width="4">BOLD</button>
+                      <button type="button" data-trace-width="7">EXTRA THICK</button>
+                    </div>
+                  </div>
+
+                  <div class="trace-style-control" aria-label="3D trace rendering controls">
+                    <div class="trace-option-group option-row--compact option-row--two" aria-label="Trace visibility">
+                      <span>DISPLAY</span>
+                      <button type="button" data-trace-visible="true">ON</button>
+                      <button type="button" data-trace-visible="false" class="active">OFF</button>
+                    </div>
+                    <div class="trace-option-group option-row--compact option-row--two" aria-label="Trace point display">
+                      <span>POINTS</span>
+                      <button type="button" data-trace-dots="true">DOTS + LINE</button>
+                      <button type="button" data-trace-dots="false" class="active">LINE ONLY</button>
+                    </div>
+                    <div class="trace-option-group option-row--compact option-row--two" aria-label="Trace path smoothing">
+                      <span>PATH</span>
+                      <button type="button" data-trace-smoothing="false">RAW</button>
+                      <button type="button" data-trace-smoothing="true" class="active">SMOOTH</button>
+                    </div>
+                  </div>
+
+                  <div class="environment-control environment-control--line" aria-label="Trace sampling controls">
+                    <div class="trace-sampling-control option-grid--two" aria-label="Line sampling rate">
+                      <span>LINE SAMPLE RATE</span>
+                      <button type="button" data-trace-sample-rate="5">5 HZ</button>
+                      <button type="button" data-trace-sample-rate="10">10 HZ</button>
+                      <button type="button" data-trace-sample-rate="20">20 HZ</button>
+                      <button type="button" data-trace-sample-rate="30" class="active">30 HZ</button>
+                      <button type="button" data-trace-sample-rate="60">60 HZ</button>
+                      <button type="button" data-trace-sample-rate="90">90 HZ</button>
+                      <button type="button" data-trace-sample-rate="120">120 HZ</button>
+                      <button type="button" data-trace-sample-rate="240">240 HZ</button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="control-section control-section--body-points" aria-label="Color dots display">
+                <button
+                  id="body-points-toggle"
+                  class="control-section-toggle body-points-toggle"
+                  type="button"
+                  aria-pressed="false"
+                  aria-label="Show colored body points"
+                >
+                  <span>COLOR DOTS</span><strong id="body-points-status">OFF</strong>
+                </button>
+              </section>
+
+              <section class="control-section control-section--body-centering" aria-label="Body position behavior">
+                <button
+                  id="body-centering-toggle"
+                  class="control-section-toggle body-centering-toggle"
+                  type="button"
+                  aria-pressed="true"
+                  aria-label="Allow the avatar to move through space"
+                >
+                  <span>BODY POSITION</span><strong id="body-centering-status">FIXED CENTER</strong>
+                </button>
+              </section>
+
+              <section class="control-section control-section--physics" aria-label="Physics constants">
+                <button
+                  id="physics-constants-toggle"
+                  class="control-section-toggle physics-constants-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="physics-constants-panel"
+                >
+                  <span>PHYSICS CONSTANTS</span><strong id="physics-constants-status">SHOW</strong>
+                </button>
+                <div id="physics-constants-panel" class="control-section-panel physics-constants-panel" hidden>
+                  <div class="menu-panel-header">
+                    <span>PHYSICS CONSTANTS</span>
+                    <button id="physics-constants-close" class="menu-panel-close" type="button" aria-label="Close Physics Constants">×</button>
+                  </div>
+                  <p class="physics-constants-intro">
+                    NORMALIZED SIMULATION COEFFICIENTS · 1× IS THE CALIBRATED BASELINE
+                  </p>
+                  <div class="physics-constants-grid">
+                    <label class="flow-slider-group physics-constant-group" for="physics-heat-deposition-rate">
+                      <span>HEAT DEPOSITION RATE <output data-physics-value="heatDepositionRate">1.15×</output></span>
+                      <small>Movement energy converted to local heat.</small>
+                      <input id="physics-heat-deposition-rate" data-physics-constant="heatDepositionRate" type="range" min="0.25" max="2.5" step="0.05" value="1.15">
+                    </label>
+                    <label class="flow-slider-group physics-constant-group" for="physics-thermal-dissipation-rate">
+                      <span>THERMAL DISSIPATION RATE <output data-physics-value="thermalDissipationRate">1.00×</output></span>
+                      <small>Stored heat lost to the environment.</small>
+                      <input id="physics-thermal-dissipation-rate" data-physics-constant="thermalDissipationRate" type="range" min="0.25" max="2.5" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group physics-constant-group" for="physics-thermal-diffusivity">
+                      <span>THERMAL DIFFUSIVITY <output data-physics-value="thermalDiffusivity">1.00×</output></span>
+                      <small>Heat transfer between body regions.</small>
+                      <input id="physics-thermal-diffusivity" data-physics-constant="thermalDiffusivity" type="range" min="0" max="3" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group physics-constant-group" for="physics-activity-memory-persistence">
+                      <span>ACTIVITY-MEMORY PERSISTENCE <output data-physics-value="activityMemoryPersistence">1.00×</output></span>
+                      <small>Retention created by repeated movement.</small>
+                      <input id="physics-activity-memory-persistence" data-physics-constant="activityMemoryPersistence" type="range" min="0.25" max="3" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group physics-constant-group" for="physics-flow-velocity-damping">
+                      <span>FLOW VELOCITY DAMPING <output data-physics-value="flowVelocityDamping">1.00×</output></span>
+                      <small>Residual flow-field momentum loss.</small>
+                      <input id="physics-flow-velocity-damping" data-physics-constant="flowVelocityDamping" type="range" min="0.25" max="3" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group physics-constant-group" for="physics-flow-momentum-diffusivity">
+                      <span>FLOW MOMENTUM DIFFUSIVITY <output data-physics-value="flowMomentumDiffusivity">1.00×</output></span>
+                      <small>Turbulent momentum spread through the field.</small>
+                      <input id="physics-flow-momentum-diffusivity" data-physics-constant="flowMomentumDiffusivity" type="range" min="0" max="3" step="0.05" value="1">
+                    </label>
+                  </div>
+                  <button id="physics-constants-reset" class="physics-constants-reset" type="button">RESET CONSTANTS</button>
+                </div>
+              </section>
+
+              <section class="control-section control-section--mix-up" aria-label="Mix-up movement controls">
+                <button
+                  id="mix-up-toggle"
+                  class="control-section-toggle mix-up-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="mix-up-panel"
+                >
+                  <span>MIX-UP</span><strong id="mix-up-toggle-status">SHOW</strong>
+                </button>
+              </section>
+
+              <div id="effect-menu-slot" class="effect-menu-slot"></div>
+
+              <section class="control-section control-section--sequence" aria-label="Sequence timeline display">
+                <button
+                  id="sequence-timeline-toggle"
+                  class="control-section-toggle sequence-timeline-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="sequence-timeline-panel"
+                >
+                  <span>SEQUENCE TIMELINE</span><strong id="sequence-timeline-toggle-status">SHOW</strong>
+                </button>
+              </section>
+
+              <section class="control-section control-section--analysis" aria-label="Motion analysis display">
+                <button
+                  id="analysis-panel-toggle"
+                  class="control-section-toggle analysis-panel-toggle"
+                  type="button"
+                  aria-expanded="true"
+                  aria-controls="analysis-panel"
+                >
+                  <span>MOTION ANALYSIS</span><strong id="analysis-panel-status">HIDE</strong>
+                </button>
+              </section>
+            </div>
+
+            <div class="effect-menu-stack">
+              <div class="visualization-menu">
+                <button
+                  id="visualization-menu-toggle"
+                  class="visualization-menu-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="visualization-menu-panel"
+                >
+                  <span>NO.60 ELEMENTS</span><strong id="visualization-menu-status">SHOW</strong>
+                </button>
+                <div id="visualization-menu-panel" class="visualization-menu-panel" hidden>
+                  <div class="menu-panel-header">
+                    <span>NO.60 ELEMENTS</span>
+                    <button id="visualization-menu-close" class="menu-panel-close" type="button" aria-label="Close NO.60 Elements">×</button>
+                  </div>
+                  <div class="experiment-control option-grid--two" aria-label="Movement visualization lenses">
+                    <span>MOVEMENT LENS</span>
+                    <button type="button" data-experiment="energy" title="Force, momentum, acceleration and deceleration">ENERGY</button>
+                    <button type="button" data-experiment="curves" title="Circular pathways, arcs and curved versus linear motion">CIRCLES + CURVES</button>
+                    <button type="button" data-experiment="axes" title="Joint pivots, rotational axes and balance points">AXIS POINTS</button>
+                    <button type="button" data-experiment="sync" title="Coordination between left and right limbs">SYNCHRONOUS LIMBS</button>
+                    <button type="button" data-experiment="space" title="Body envelope, directions, planes and dimensions">EXTERNAL BODY SPACES</button>
+                    <button type="button" data-experiment="relations" title="Attention shifts between body parts and poses">SHIFTING RELATIONS</button>
+                    <button type="button" data-experiment="all">ALL</button>
+                    <button type="button" data-experiment="off" class="active">OFF</button>
+                  </div>
+                  <p id="experiment-description" class="experiment-description" aria-live="polite">
+                    MOVEMENT LENSES OFF · SELECT ONE OR COMBINE MULTIPLE VIEWS
+                  </p>
+                </div>
+              </div>
+
+              <div class="no60-modification-control">
+                <button
+                  id="no60-modification-toggle"
+                  class="control-section-toggle no60-modification-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="no60-modification-panel"
+                >
+                  <span>NO.60 MODIFICATION</span><strong id="no60-modification-toggle-status">SHOW</strong>
+                </button>
+              </div>
+
+              <div class="no60-element-analysis-control">
+                <button
+                  id="no60-element-analysis-toggle"
+                  class="control-section-toggle no60-element-analysis-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="no60-element-analysis-panel"
+                >
+                  <span>NO.60 ELEMENT ANALYSIS</span><strong id="no60-element-analysis-toggle-status">SHOW</strong>
+                </button>
+              </div>
+
+              <div class="flow-field-menu">
+                <div class="control-section-header control-section-header--flow">
+                  <button
+                    id="flow-field-display-toggle"
+                    class="control-section-toggle flow-field-display-toggle"
+                    type="button"
+                    aria-pressed="false"
+                    aria-label="Show flow field"
+                  >
+                    <span>FLOW FIELD</span><strong id="flow-field-display-status">OFF</strong>
+                  </button>
+                  <button
+                    id="flow-field-menu-toggle"
+                    class="control-section-toggle flow-field-menu-toggle"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="flow-field-menu-panel"
+                  >
+                    <span>CONTROLS</span><strong id="flow-field-menu-status">SHOW</strong>
+                  </button>
+                </div>
+                <div id="flow-field-menu-panel" class="visualization-menu-panel flow-field-menu-panel" hidden>
+                  <div class="menu-panel-header">
+                    <span>FLOW FIELD</span>
+                    <button id="flow-field-menu-close" class="menu-panel-close" type="button" aria-label="Close Flow Field controls">×</button>
+                  </div>
+                  <div class="flow-field-control" aria-label="Movement-driven flow field controls">
+                    <div class="flow-option-group option-row--two" aria-label="Flow field display">
+                      <span>DISPLAY</span>
+                      <button type="button" data-flow-enabled="true">ON</button>
+                      <button type="button" data-flow-enabled="false" class="active">OFF</button>
+                    </div>
+                    <div class="flow-option-group" aria-label="Flow field particle reset">
+                      <span>PARTICLES</span>
+                      <button id="flow-field-reset" type="button">RESET FIELD</button>
+                    </div>
+                    <label class="flow-slider-group" for="flow-field-thickness">
+                      <span>THICKNESS <output data-flow-value="thickness">1.5 PX</output></span>
+                      <input id="flow-field-thickness" data-flow-field-slider="thickness" type="range" min="0.25" max="8" step="0.05" value="1.5">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-opacity">
+                      <span>PARTICLE OPACITY <output data-flow-value="opacity">100%</output></span>
+                      <input id="flow-field-opacity" data-flow-field-slider="opacity" type="range" min="0" max="1" step="0.01" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-trail-length">
+                      <span>TRAIL LENGTH <output data-flow-value="trailLength">1.00×</output></span>
+                      <input id="flow-field-trail-length" data-flow-field-slider="trailLength" type="range" min="0.1" max="8" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-trail-fade">
+                      <span>TRAIL FADE <output data-flow-value="trailFade">80%</output></span>
+                      <input id="flow-field-trail-fade" data-flow-field-slider="trailFade" type="range" min="0" max="1" step="0.01" value="0.8">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-stroke-length">
+                      <span>STROKE LENGTH <output data-flow-value="strokeLength">1.00×</output></span>
+                      <input id="flow-field-stroke-length" data-flow-field-slider="strokeLength" type="range" min="0.1" max="5" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-curvature">
+                      <span>CURVE INERTIA <output data-flow-value="curvature">1.00×</output></span>
+                      <input id="flow-field-curvature" data-flow-field-slider="curvature" type="range" min="0" max="5" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-speed">
+                      <span>SPEED <output data-flow-value="speed">1.00×</output></span>
+                      <input id="flow-field-speed" data-flow-field-slider="speed" type="range" min="0.05" max="8" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-count">
+                      <span>DENSITY <output data-flow-value="count">4,800</output></span>
+                      <input id="flow-field-count" data-flow-field-slider="count" type="range" min="200" max="7200" step="100" value="4800">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-color-variation">
+                      <span>GRADIENT VARIATION <output data-flow-value="colorVariation">1.00×</output></span>
+                      <input id="flow-field-color-variation" data-flow-field-slider="colorVariation" type="range" min="0" max="3" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-influence">
+                      <span>AVATAR INFLUENCE <output data-flow-value="influence">1.00×</output></span>
+                      <input id="flow-field-influence" data-flow-field-slider="influence" type="range" min="0" max="5" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-body-flow">
+                      <span>FLOW AROUND AVATAR <output data-flow-value="bodyFlow">1.00×</output></span>
+                      <input id="flow-field-body-flow" data-flow-field-slider="bodyFlow" type="range" min="0" max="5" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-recovery">
+                      <span>FLOW RECOVERY <output data-flow-value="recovery">1.00×</output></span>
+                      <input id="flow-field-recovery" data-flow-field-slider="recovery" type="range" min="0.05" max="8" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-proximity-fade">
+                      <span>DISTANCE FADE <output data-flow-value="proximityFade">1.00×</output></span>
+                      <input id="flow-field-proximity-fade" data-flow-field-slider="proximityFade" type="range" min="0" max="4" step="0.05" value="1">
+                    </label>
+                    <label class="flow-slider-group" for="flow-field-concentration">
+                      <span>AVATAR CONCENTRATION <output data-flow-value="concentration">1.00×</output></span>
+                      <input id="flow-field-concentration" data-flow-field-slider="concentration" type="range" min="0" max="5" step="0.05" value="1">
+                    </label>
+                    <div class="flow-option-group option-grid--two" aria-label="Flow field color gradient">
+                      <span>COLOR PRESETS</span>
+                      <button type="button" data-flow-gradient="ocean" class="active">OCEAN</button>
+                      <button type="button" data-flow-gradient="heat">HEAT</button>
+                      <button type="button" data-flow-gradient="aurora">AURORA</button>
+                      <button type="button" data-flow-gradient="ember">EMBER</button>
+                    </div>
+                    <div class="flow-color-group" aria-label="Custom particle color gradient">
+                      <span>PARTICLE COLORS</span>
+                      <label for="flow-field-color-start">
+                        START
+                        <input id="flow-field-color-start" data-flow-color-stop="0" type="color" value="#123dff" aria-label="Particle gradient start color">
+                      </label>
+                      <label for="flow-field-color-middle">
+                        MIDDLE
+                        <input id="flow-field-color-middle" data-flow-color-stop="1" type="color" value="#65f3ff" aria-label="Particle gradient middle color">
+                      </label>
+                      <label for="flow-field-color-end">
+                        END
+                        <input id="flow-field-color-end" data-flow-color-stop="2" type="color" value="#f4ffff" aria-label="Particle gradient end color">
+                      </label>
+                    </div>
+                  </div>
+                  <p id="flow-field-description" class="experiment-description" aria-live="polite">
+                    OFF · ENABLE PARTICLES TO REVEAL MOVEMENT-GENERATED CURRENTS + DECAYING TURBULENT STREAMS
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="axis-widget" aria-hidden="true">
+              <span class="axis-y">Y</span>
+              <span class="axis-x">X</span>
+              <span class="axis-z">Z</span>
+              <i></i>
+              <b></b>
+            </div>
+
+          </div>
+        </section>
+
+        <aside id="analysis-panel" class="analysis-panel panel">
+          <div
+            id="analysis-resizer"
+            class="analysis-resizer"
+            role="separator"
+            aria-label="Resize graph panel"
+            aria-orientation="vertical"
+            aria-valuemin="300"
+            aria-valuemax="760"
+            aria-valuenow="390"
+            tabindex="0"
+          ><span></span></div>
+          <div class="analysis-heading">
+            <span>01</span>
+            <div><h2>MOTION ANALYSIS</h2><p>ROLLING 9-SECOND DISPLACEMENT</p></div>
+            <button id="analysis-panel-close" class="menu-panel-close analysis-panel-close" type="button" aria-label="Close Motion Analysis">×</button>
+          </div>
+
+          <p class="analysis-intro">
+            Each graph shows the tracked point's X, Y and Z displacement from its starting position,
+            normalized by body height across a 3× longer history. AVG is the mean of X, Y and Z.
+          </p>
+
+          <div class="graph-view-control" aria-label="Graph signal display">
+            <span>SHOW</span>
+            <button type="button" data-graph-mode="all" class="active">ALL</button>
+            <button type="button" data-graph-mode="x">X</button>
+            <button type="button" data-graph-mode="y">Y</button>
+            <button type="button" data-graph-mode="z">Z</button>
+            <button type="button" data-graph-mode="average">AVG</button>
+          </div>
+
+          <div class="signal-list" id="signal-list"></div>
+
+          <div class="rule"></div>
+
+          <section class="angles-section">
+            <div class="subheading"><h3>JOINT GEOMETRY</h3><span>LIVE</span></div>
+            <div class="angle-grid">
+              <div><span>ELBOW</span><strong id="elbow-angle">—°</strong></div>
+              <div><span>KNEE</span><strong id="knee-angle">—°</strong></div>
+              <div><span>TORSO LEAN</span><strong id="torso-angle">—°</strong></div>
+            </div>
+          </section>
+
+          <div class="analysis-key">
+            <span data-graph-key="x"><i class="axis-key axis-key--x"></i>X</span>
+            <span data-graph-key="y"><i class="axis-key axis-key--y"></i>Y</span>
+            <span data-graph-key="z"><i class="axis-key axis-key--z"></i>Z</span>
+            <span data-graph-key="average" hidden><i class="axis-key axis-key--average"></i>AVG</span>
+          </div>
+        </aside>
+      </main>
+
+      <section id="sequence-timeline-panel" class="sequence-timeline-panel" aria-label="Editable movement sequence timeline" hidden>
+        <header class="sequence-timeline-heading">
+          <div>
+            <span>SEQUENCE TIMELINE</span>
+            <strong id="sequence-status" aria-live="polite">EMPTY · ADD MOVEMENTS 1–59</strong>
+          </div>
+          <div class="sequence-timeline-actions">
+            <button id="sequence-play" type="button">PLAY SEQUENCE</button>
+            <button
+              id="sequence-add-all"
+              type="button"
+              title="Replace the timeline with all 59 movements in numerical order"
+              aria-label="Add all movements 1 through 59 in sequential order"
+            >ADD ALL 1–59</button>
+            <button id="sequence-random-five" type="button" title="Replace the timeline with five random movements from 1–59">RANDOM 5</button>
+            <button id="sequence-clear" type="button">CLEAR</button>
+            <button id="sequence-timeline-close" class="menu-panel-close" type="button" aria-label="Hide sequence timeline">×</button>
+          </div>
+        </header>
+        <div id="sequence-track" class="sequence-track" aria-live="polite"></div>
+      </section>
+
+      <section id="mix-up-panel" class="sequence-timeline-panel mix-up-panel" aria-label="Mix movement body parts" hidden>
+        <header class="sequence-timeline-heading">
+          <div>
+            <span>MIX-UP</span>
+            <strong id="mix-up-status" aria-live="polite">READY · COMBINE MOVEMENT SOURCES BY BODY REGION</strong>
+          </div>
+          <div class="sequence-timeline-actions">
+            <button id="mix-up-play" type="button">PLAY MIX</button>
+            <button id="mix-up-reset" type="button">RESET</button>
+            <button id="mix-up-close" class="menu-panel-close" type="button" aria-label="Hide Mix-up panel">×</button>
+          </div>
+        </header>
+        <div class="mix-up-content">
+          <section class="mix-up-randomizer" aria-label="Random mix methods">
+            <div>
+              <span>RANDOM METHODS</span>
+              <p>Generate a layered dancer instantly from movements 1–59.</p>
+            </div>
+            <button type="button" data-mix-up-method="topBottom">
+              <strong>TOP / BOTTOM</strong><small>Upper and lower body from two movements</small>
+            </button>
+            <button type="button" data-mix-up-method="leftRight">
+              <strong>LEFT / RIGHT</strong><small>Left, center, and right from three movements</small>
+            </button>
+            <button type="button" data-mix-up-method="frankenstein">
+              <strong>FRANKENSTEIN</strong><small>Every region from a different movement</small>
+            </button>
+          </section>
+          <section class="mix-up-sources" aria-label="Movement source for each body region">
+            <div class="mix-up-sources__intro">
+              <span>BODY REGION SOURCES</span>
+              <p>Shorter clips loop independently. Every loop blends back to its first non-T-pose frame.</p>
+            </div>
+            <div id="mix-up-source-grid" class="mix-up-source-grid"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="no60-modification-panel" class="sequence-timeline-panel no60-modification-panel" aria-label="NO.60 movement modification comparison" hidden>
+        <div
+          id="no60-modification-resizer"
+          class="no60-modification-resizer"
+          role="separator"
+          aria-label="Resize NO.60 modification drawer"
+          aria-orientation="horizontal"
+          aria-valuemin="68"
+          aria-valuemax="720"
+          aria-valuenow="375"
+          tabindex="0"
+        ><span></span></div>
+        <header class="sequence-timeline-heading no60-modification-heading">
+          <div>
+            <span>NO.60 MODIFICATION</span>
+            <strong id="no60-modification-status" aria-live="polite">ORIGINAL + MODIFIED · SYNCHRONIZED COMPARISON</strong>
+          </div>
+          <div class="sequence-timeline-actions">
+            <button id="no60-modification-random" type="button">RANDOM</button>
+            <button id="no60-modification-reset" type="button">RESET</button>
+            <button id="no60-modification-close" class="menu-panel-close" type="button" aria-label="Exit NO.60 Modification">×</button>
+          </div>
+        </header>
+        <div class="no60-modification-content">
+          <div id="no60-modification-controls" class="no60-modification-controls" aria-label="NO.60 element modification controls"></div>
+        </div>
+        <aside id="no60-modification-info" class="no60-modification-info" aria-live="polite" hidden>
+          <button id="no60-modification-info-close" class="menu-panel-close" type="button" aria-label="Close element explanation">×</button>
+          <h3 id="no60-modification-info-title">ELEMENT</h3>
+          <dl>
+            <div><dt>MEANING</dt><dd id="no60-modification-info-meaning"></dd></div>
+            <div><dt>VISUAL EFFECT</dt><dd id="no60-modification-info-visual"></dd></div>
+            <div><dt>TECHNICAL</dt><dd id="no60-modification-info-technical"></dd></div>
+            <div><dt>BODY REGIONS + BOUNDARIES</dt><dd id="no60-modification-info-boundary"></dd></div>
+          </dl>
+        </aside>
+      </section>
+
+      <section id="no60-element-analysis-panel" class="sequence-timeline-panel no60-element-analysis-panel" aria-label="NO.60 element analysis over time" hidden>
+        <div
+          id="no60-element-analysis-resizer"
+          class="no60-modification-resizer no60-element-analysis-resizer"
+          role="separator"
+          aria-label="Resize NO.60 element analysis drawer"
+          aria-orientation="horizontal"
+          aria-valuemin="68"
+          aria-valuemax="720"
+          aria-valuenow="405"
+          tabindex="0"
+        ><span></span></div>
+        <header class="sequence-timeline-heading no60-modification-heading no60-element-analysis-heading">
+          <div>
+            <span>NO.60 ELEMENT ANALYSIS</span>
+            <strong id="no60-element-analysis-status" aria-live="polite">ANALYZING CURRENT MOVEMENT…</strong>
+          </div>
+          <div class="sequence-timeline-actions">
+            <button
+              id="no60-element-analysis-guide-toggle"
+              class="no60-element-analysis-guide-toggle"
+              type="button"
+              aria-controls="no60-element-analysis-guide"
+              aria-expanded="false"
+            >ALGORITHM GUIDE</button>
+            <button id="no60-element-analysis-close" class="menu-panel-close" type="button" aria-label="Hide NO.60 Element Analysis">×</button>
+          </div>
+        </header>
+        <div class="no60-element-analysis-content">
+          <div id="no60-element-analysis-values" class="no60-element-analysis-values" aria-label="Current NO.60 element percentages"></div>
+          <div class="no60-element-analysis-chart-wrap">
+            <canvas
+              id="no60-element-analysis-chart"
+              class="no60-element-analysis-chart"
+              role="img"
+              aria-label="Dominating-element timeline and line graph of six NO.60 movement elements from zero to one hundred percent over time"
+            ></canvas>
+            <div id="no60-element-analysis-tooltip" class="no60-element-analysis-tooltip" role="tooltip" hidden></div>
+          </div>
+          <p class="no60-element-analysis-method">
+            DOMINANT BAR SECTION LENGTH REPRESENTS TIME · CLICK ELEMENT CARDS TO SHOW OR HIDE LINES · LIVE POSE FEATURES · TEMPORALLY SMOOTHED
+          </p>
+        </div>
+        <section id="no60-element-analysis-guide" class="no60-element-analysis-guide" aria-label="How the six NO.60 element algorithms work" hidden>
+          <div class="no60-element-analysis-guide-overview">
+            <div>
+              <span>METHODOLOGY</span>
+              <h3>HOW THE SIX ELEMENT SCORES ARE CALCULATED</h3>
+            </div>
+            <p>Each animation is sampled across its full playable duration. Positions are measured relative to the hips, rotations use world-space quaternions, and central differences estimate velocity and acceleration. Scores describe this movement relative to its own activity range; they are analytical proxies, not absolute scientific or physiological measurements.</p>
+          </div>
+          <div id="no60-element-analysis-guide-grid" class="no60-element-analysis-guide-grid"></div>
+          <p class="no60-element-analysis-guide-note">
+            DOMINANCE TIMELINE · THE HIGHEST SCORE WINS · A 6-POINT SWITCH MARGIN AND MINIMUM-DURATION FILTER REMOVE ONE-FRAME FLUCTUATIONS
+          </p>
+        </section>
+      </section>
+
+      <footer class="transport">
+        <button id="play-button" class="play-button" type="button" aria-label="Pause animation">
+          <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" /></svg>
+          <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z" /></svg>
+        </button>
+
+        <div class="timecode"><span id="current-time">00:00.00</span><small id="total-time">00:00.00</small></div>
+
+        <div class="timeline-wrap">
+          <input id="timeline" type="range" min="0" max="1" value="0" step="0.001" aria-label="Animation timeline" />
+          <div class="timeline-marks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+
+        <div class="speed-control" aria-label="Playback speed">
+          <span id="speed-control-label">SPEED</span>
+          <details id="playback-speed-menu" class="speed-menu">
+            <summary aria-label="Choose playback speed">
+              <strong id="playback-speed-value">3×</strong>
+              <span class="speed-menu__chevron" aria-hidden="true">⌃</span>
+            </summary>
+            <div class="speed-menu__options" role="radiogroup" aria-label="Playback speed options">
+              <button type="button" role="radio" aria-checked="false" data-speed="0.05">0.05×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="0.1">0.1×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="0.5">0.5×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="1">1×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="1.5">1.5×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="2">2×</button>
+              <button type="button" role="radio" aria-checked="true" data-speed="3" class="active">3×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="4">4×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="5">5×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="10">10×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="20">20×</button>
+              <button type="button" role="radio" aria-checked="false" data-speed="50">50×</button>
+            </div>
+          </details>
+          <button id="apply-sequence-speed-all" class="speed-apply-all" type="button" disabled>APPLY ALL</button>
+        </div>
+
+        <button id="reset-button" class="reset-button" type="button" aria-label="Reset camera and animation">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V3m0 0h5M4 3l4 4a8 8 0 1 1-2 8" /></svg>
+          RESET
+        </button>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>
